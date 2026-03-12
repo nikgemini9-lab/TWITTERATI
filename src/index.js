@@ -30,19 +30,20 @@ async function initDbWithRetry(maxAttempts = 8, baseDelayMs = 3000) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       await db.initSchema();
-      return; // success
+      console.log('[Boot] DB ready');
+      return;
     } catch (err) {
       const detail = err?.message || err?.code || JSON.stringify(err) || String(err);
       console.error(`[Boot] DB init attempt ${attempt}/${maxAttempts} failed: ${detail}`);
+      if (err?.stack) console.error(err.stack);
 
       if (attempt === maxAttempts) {
-        console.error('[Boot] All DB init attempts exhausted. Exiting.');
-        console.error(err?.stack || err);
+        console.error('[Boot] All DB init attempts exhausted — giving up.');
         process.exit(1);
       }
 
-      const delay = baseDelayMs * attempt; // 3s, 6s, 9s … 24s
-      console.log(`[Boot] Retrying in ${delay / 1000}s…`);
+      const delay = baseDelayMs * attempt; // 3 s, 6 s, 9 s … 24 s
+      console.log(`[Boot] Retrying DB in ${delay / 1000}s…`);
       await new Promise((r) => setTimeout(r, delay));
     }
   }
@@ -51,20 +52,26 @@ async function initDbWithRetry(maxAttempts = 8, baseDelayMs = 3000) {
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 async function main() {
+  // Bind the port FIRST so Render's health check / port scanner is satisfied.
+  // DB init happens afterward (with retries).
+  await new Promise((resolve) => {
+    app.listen(PORT, () => {
+      console.log(`[Server] Listening on port ${PORT}`);
+      resolve();
+    });
+  });
+
   if (!process.env.DATABASE_URL) {
-    console.error('[Boot] DATABASE_URL is not set. Check your environment variables.');
+    console.error('[Boot] DATABASE_URL is not set — check Render environment variables / database link.');
     process.exit(1);
   }
 
-  // Start HTTP server immediately so Render's health check passes
-  app.listen(PORT, () => {
-    console.log(`[Server] Listening on port ${PORT}`);
-  });
-
-  // Then initialise DB (with retries in case the managed DB isn't ready yet)
   await initDbWithRetry();
 
   scheduler.start();
 }
 
-main();
+main().catch((err) => {
+  console.error('[Boot] Fatal:', err?.stack || err);
+  process.exit(1);
+});
