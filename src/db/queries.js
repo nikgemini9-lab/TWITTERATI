@@ -124,8 +124,8 @@ async function recalculateGrowth() {
     const vph = row.views_delta / row.hours_elapsed;
 
     let status = 'normal';
-    if (lph > 2000 || vph > 100000) status = 'parabolic';
-    else if (lph > 500 || vph > 20000) status = 'fast';
+    if (lph > 1500 || vph > 60000) status = 'parabolic';
+    else if (lph > 500 || vph > 15000) status = 'fast';
 
     await db.query(
       `UPDATE tweets

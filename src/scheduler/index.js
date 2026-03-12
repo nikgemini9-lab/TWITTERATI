@@ -58,16 +58,16 @@ async function runCleanup() {
 // ─── Start scheduler ──────────────────────────────────────────────────────────
 
 function start() {
-  // Fetch new viral tweets every 30 minutes
-  cron.schedule('*/30 * * * *', runFetch);
+  // Fetch new viral tweets every 15 minutes (1-hour search window means we need to check often)
+  cron.schedule('*/15 * * * *', runFetch);
 
-  // Refresh metrics for tracked tweets every 60 minutes
-  cron.schedule('0 * * * *', runRefresh);
+  // Refresh metrics for tracked tweets every 30 minutes
+  cron.schedule('*/30 * * * *', runRefresh);
 
   // Daily cleanup at 03:00
   cron.schedule('0 3 * * *', runCleanup);
 
-  console.log('[Scheduler] Jobs scheduled: fetch=30min, refresh=60min, cleanup=daily 03:00');
+  console.log('[Scheduler] Jobs scheduled: fetch=15min, refresh=30min, cleanup=daily 03:00');
 
   // Run fetch immediately on startup so data is available right away
   setImmediate(runFetch);
