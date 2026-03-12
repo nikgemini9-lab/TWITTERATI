@@ -1,9 +1,9 @@
 const { getClient } = require('./client');
 const { upsertTweet, insertSnapshot, getTweetIdsForRefresh, recalculateGrowth } = require('../db/queries');
 
-const MIN_LIKES   = parseInt(process.env.MIN_LIKES, 10)  || 200;  // cast wide net early
-const HOURS_BACK  = parseInt(process.env.HOURS_BACK, 10) || 2;    // 2-hour window to catch acceleration
-const MAX_PAGES   = parseInt(process.env.MAX_PAGES, 10)  || 15;   // 15 × 20 = 300 tweets max
+const MIN_LIKES   = parseInt(process.env.MIN_LIKES, 10)  || 800;  // low enough to catch early, high enough to cut noise
+const HOURS_BACK  = parseInt(process.env.HOURS_BACK, 10) || 2;    // 2-hour window to measure acceleration
+const MAX_PAGES   = parseInt(process.env.MAX_PAGES, 10)  || 10;   // 10 × 20 = 200 tweets max
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
