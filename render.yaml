@@ -7,7 +7,7 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: TWITTER_BEARER_TOKEN
+      - key: RETTIWT_API_KEY
         sync: false          # set manually in Render dashboard
       - key: DATABASE_URL
         fromDatabase:
