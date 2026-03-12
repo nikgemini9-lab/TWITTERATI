@@ -1,59 +1,107 @@
 /* global Chart */
 
 const App = (() => {
-  // ─── State ───────────────────────────────────────────────────────────────────
-  let autoRefreshInterval = null;
-  let likesChart = null;
-  let viewsChart = null;
+  let activeTab    = 'all';
+  let autoTimer    = null;
+  let likesChart   = null;
+  let viewsChart   = null;
+  let allTweets    = [];   // cache for tab counts
 
-  // ─── Utility ─────────────────────────────────────────────────────────────────
+  // ─── Formatters ────────────────────────────────────────────────────────────
 
   function fmt(n) {
-    if (n === null || n === undefined) return '—';
+    if (n === null || n === undefined || n === '') return '—';
     n = Number(n);
+    if (isNaN(n)) return '—';
     if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
     if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
     if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
     return n.toLocaleString();
   }
 
-  function timeAgo(dateStr) {
-    if (!dateStr) return '—';
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 1)  return 'just now';
-    if (m < 60) return `${m}m ago`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h ago`;
-    return `${Math.floor(h / 24)}d ago`;
+  function timeAgo(ds) {
+    if (!ds) return '—';
+    const m = Math.floor((Date.now() - new Date(ds)) / 60000);
+    if (m < 1)    return 'just now';
+    if (m < 60)   return `${m}m ago`;
+    if (m < 1440) return `${Math.floor(m / 60)}h ago`;
+    return `${Math.floor(m / 1440)}d ago`;
   }
 
-  function statusBadge(status) {
-    const map = {
-      parabolic: ['badge-parabolic', '🔥 Parabolic'],
-      fast:      ['badge-fast',      '⚡ Fast'],
-      normal:    ['badge-normal',    '✓ Normal'],
-    };
-    const [cls, label] = map[status] || map.normal;
-    return `<span class="badge ${cls}">${label}</span>`;
+  function esc(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  function showToast(msg, type = 'success') {
-    const el = document.getElementById('toast');
-    el.textContent = msg;
-    el.className = `toast ${type} show`;
-    setTimeout(() => { el.className = 'toast'; }, 3000);
+  function avatarLetter(handle) {
+    return (handle || '?').replace('@', '')[0] || '?';
   }
 
-  // ─── API calls ────────────────────────────────────────────────────────────────
+  // ─── Badge helpers ──────────────────────────────────────────────────────────
 
-  async function apiFetch(url) {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
+  function badgeClass(status) {
+    return { parabolic: 'b-p', fast: 'b-f', normal: 'b-n' }[status] || 'b-n';
+  }
+  function badgeLabel(status) {
+    return { parabolic: '🔥 Parabolic', fast: '⚡ Fast', normal: '✓ Normal' }[status] || status;
   }
 
-  // ─── Stats ────────────────────────────────────────────────────────────────────
+  // ─── Card renderer ──────────────────────────────────────────────────────────
+
+  function renderCard(t, i) {
+    const handle  = t.author_handle ? `@${t.author_handle}` : '—';
+    const name    = t.author_name   || handle;
+    const url     = t.tweet_url     || '#';
+    const lph     = t.likes_per_hour > 0 ? `+${fmt(t.likes_per_hour)}/hr` : null;
+    const vph     = t.views_per_hour > 0 ? `+${fmt(t.views_per_hour)}/hr` : null;
+
+    const mediaTag = t.has_media
+      ? `<span class="media-tag">${t.media_type || 'media'}</span><br>`
+      : '';
+
+    const growthChips = (lph || vph) ? `
+      <div class="growth-chips">
+        ${lph ? `<span class="gc">▲ ${lph} likes</span>` : ''}
+        ${vph ? `<span class="gc v">▲ ${vph} views</span>` : ''}
+      </div>` : '<span></span>';
+
+    return `
+      <div class="card ${t.status}" data-id="${t.tweet_id}">
+        <div class="card-top">
+          <div class="card-author">
+            <div class="avatar">${avatarLetter(t.author_handle)}</div>
+            <div>
+              <div class="author-name">${esc(name)}</div>
+              <div class="author-handle">${esc(handle)}</div>
+            </div>
+          </div>
+          <span class="badge ${badgeClass(t.status)}">${badgeLabel(t.status)}</span>
+        </div>
+
+        <div class="card-text">${mediaTag}${esc(t.tweet_text || '')}</div>
+
+        <div class="metrics">
+          <div class="m hi"><div class="mv">${fmt(t.likes)}</div><div class="ml">Likes</div></div>
+          <div class="m">   <div class="mv">${fmt(t.retweets)}</div><div class="ml">RTs</div></div>
+          <div class="m">   <div class="mv">${fmt(t.replies)}</div><div class="ml">Replies</div></div>
+          <div class="m">   <div class="mv">${fmt(t.views)}</div><div class="ml">Views</div></div>
+        </div>
+
+        <div class="growth-row">
+          ${growthChips}
+          <span>${timeAgo(t.posted_at)}</span>
+        </div>
+
+        <div class="card-foot">
+          <div class="vscore">Score: <span>${fmt(Math.round(t.virality_score || 0))}</span></div>
+          <div class="card-btns">
+            <button class="cbtn" onclick="App.openChart('${t.tweet_id}','${esc(handle)}','${esc(url)}')">Chart</button>
+            <a class="cbtn open" href="${esc(url)}" target="_blank" rel="noreferrer">Open ↗</a>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ─── Stats ──────────────────────────────────────────────────────────────────
 
   async function loadStats() {
     try {
@@ -64,231 +112,197 @@ const App = (() => {
       document.getElementById('statMaxLikes').textContent  = fmt(stats.max_likes);
       document.getElementById('statMaxViews').textContent  = fmt(stats.max_views);
 
+      const dot = document.getElementById('footDot');
+      const footStatus = document.getElementById('footStatus');
+      dot.className = 'dot';
+      footStatus.textContent = 'Live';
+
       const t = stats.scheduler?.lastFetch || stats.last_updated;
-      document.getElementById('lastUpdated').textContent = t
-        ? `Last updated: ${timeAgo(t)}`
-        : 'Not yet updated';
-    } catch (err) {
-      console.error('loadStats error', err);
+      document.getElementById('footFetch').textContent = t ? `Last fetch: ${timeAgo(t)}` : '';
+
+      if (stats.scheduler?.fetchRunning || stats.scheduler?.refreshRunning) {
+        dot.className = 'dot busy';
+        footStatus.textContent = 'Updating…';
+      }
+    } catch (_) {
+      document.getElementById('footDot').className = 'dot';
+      document.getElementById('footStatus').textContent = 'Offline';
     }
   }
 
-  // ─── Tweet table ──────────────────────────────────────────────────────────────
+  // ─── Tab counts ─────────────────────────────────────────────────────────────
+
+  function updateTabCounts(tweets) {
+    const counts = { all: tweets.length, parabolic: 0, fast: 0, normal: 0 };
+    for (const t of tweets) counts[t.status] = (counts[t.status] || 0) + 1;
+    document.getElementById('tcAll').textContent       = counts.all;
+    document.getElementById('tcParabolic').textContent = counts.parabolic;
+    document.getElementById('tcFast').textContent      = counts.fast;
+    document.getElementById('tcNormal').textContent    = counts.normal;
+  }
+
+  // ─── Main load ──────────────────────────────────────────────────────────────
+
+  async function apiFetch(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
 
   function buildQuery() {
-    const params = new URLSearchParams();
-    const status   = document.getElementById('filterStatus').value;
+    const p = new URLSearchParams();
     const sort     = document.getElementById('filterSort').value;
     const media    = document.getElementById('filterMedia').value;
     const minLikes = document.getElementById('filterMinLikes').value.trim();
     const author   = document.getElementById('filterAuthor').value.trim();
 
-    if (status)   params.set('status',    status);
-    if (sort)     params.set('sort',      sort);
-    if (media)    params.set('has_media', media);
-    if (minLikes) params.set('min_likes', minLikes);
-    if (author)   params.set('author',    author.replace(/^@/, ''));
-    params.set('limit', '200');
-
-    return params.toString();
+    if (activeTab !== 'all') p.set('status', activeTab);
+    if (sort)     p.set('sort',      sort);
+    if (media)    p.set('has_media', media);
+    if (minLikes) p.set('min_likes', minLikes);
+    if (author)   p.set('author',    author.replace(/^@/, ''));
+    p.set('limit', '200');
+    return p.toString();
   }
 
   async function load() {
-    const tbody = document.getElementById('tableBody');
-    tbody.innerHTML = '<tr><td colspan="12"><div class="empty-state"><div class="spinner"></div>Loading…</div></td></tr>';
+    const feed = document.getElementById('feed');
+    feed.innerHTML = '<div class="state-box"><div class="spinner"></div><p>Loading…</p></div>';
 
     try {
-      const qs = buildQuery();
-      const { tweets } = await apiFetch(`/api/tweets?${qs}`);
+      const { tweets, count } = await apiFetch(`/api/tweets?${buildQuery()}`);
+      allTweets = tweets;
+      updateTabCounts(tweets);
+
+      document.getElementById('footCount').textContent = `${count} tweets shown`;
 
       if (!tweets.length) {
-        tbody.innerHTML = '<tr><td colspan="12"><div class="empty-state">No tweets found matching your filters.</div></td></tr>';
+        feed.innerHTML = `<div class="state-box">
+          <p>No tweets found</p>
+          <small>Try broadening your filters or click "Fetch New" to pull fresh data.</small>
+        </div>`;
         return;
       }
 
-      tbody.innerHTML = tweets.map((t, i) => {
-        const handle = t.author_handle ? `@${t.author_handle}` : '—';
-        const url    = t.tweet_url || '#';
-        const text   = t.tweet_text
-          ? t.tweet_text.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-          : '';
-        const mediaBadge = t.has_media
-          ? `<span class="media-badge">${t.media_type || 'media'}</span> `
-          : '';
-
-        const lph = t.likes_per_hour ? `+${fmt(t.likes_per_hour)}/hr` : '—';
-        const vph = t.views_per_hour ? `+${fmt(t.views_per_hour)}/hr` : '—';
-
-        return `
-          <tr>
-            <td class="num muted" style="color:var(--muted)">${i + 1}</td>
-            <td class="tweet-cell">
-              <div class="tweet-author">${handle}</div>
-              <div class="tweet-text">${mediaBadge}${text}</div>
-              <a class="tweet-link" href="${url}" target="_blank" rel="noreferrer">Open on X ↗</a>
-            </td>
-            <td>${statusBadge(t.status)}</td>
-            <td class="num">${fmt(t.likes)}</td>
-            <td class="num">${fmt(t.retweets)}</td>
-            <td class="num">${fmt(t.replies)}</td>
-            <td class="num">${fmt(t.views)}</td>
-            <td class="num growth">${lph}</td>
-            <td class="num growth">${vph}</td>
-            <td class="num">${fmt(Math.round(t.virality_score))}</td>
-            <td style="color:var(--muted);font-size:12px;white-space:nowrap">${timeAgo(t.posted_at)}</td>
-            <td>
-              <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px"
-                      onclick="App.openChart('${t.tweet_id}','${handle}','${url}')">
-                Chart
-              </button>
-            </td>
-          </tr>`;
-      }).join('');
+      feed.innerHTML = tweets.map(renderCard).join('');
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="12"><div class="empty-state" style="color:var(--red)">Error: ${err.message}</div></td></tr>`;
+      feed.innerHTML = `<div class="state-box">
+        <p style="color:var(--red)">Failed to load tweets</p>
+        <small>${err.message}</small>
+      </div>`;
     }
 
-    await loadStats();
+    loadStats();
   }
 
-  function reset() {
-    document.getElementById('filterStatus').value   = 'all';
-    document.getElementById('filterSort').value     = 'likes';
-    document.getElementById('filterMedia').value    = '';
-    document.getElementById('filterMinLikes').value = '15000';
-    document.getElementById('filterAuthor').value   = '';
+  // ─── Tab switching ──────────────────────────────────────────────────────────
+
+  function setTab(el, status) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    activeTab = status;
     load();
   }
 
-  // ─── Manual refresh trigger ───────────────────────────────────────────────────
+  // ─── Manual refresh ─────────────────────────────────────────────────────────
 
   async function triggerRefresh(type) {
     try {
-      const res = await fetch('/api/refresh', {
-        method:  'POST',
+      const res  = await fetch('/api/refresh', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ type }),
+        body: JSON.stringify({ type }),
       });
       const data = await res.json();
-      showToast(data.message || 'Job started', 'success');
-      // Reload data after a short delay to catch early results
-      setTimeout(load, 5000);
+      showToast(data.message || 'Job started', 'ok');
+      setTimeout(load, 6000);
     } catch (err) {
-      showToast('Failed: ' + err.message, 'error');
+      showToast('Failed: ' + err.message, 'err');
     }
   }
 
-  // ─── Growth chart modal ───────────────────────────────────────────────────────
+  // ─── Growth chart modal ──────────────────────────────────────────────────────
 
   async function openChart(tweetId, handle, url) {
     document.getElementById('modalTitle').textContent = `Growth — ${handle}`;
     document.getElementById('modalLink').href = url;
     document.getElementById('chartModal').classList.add('open');
 
-    // Destroy previous chart instances
     if (likesChart) { likesChart.destroy(); likesChart = null; }
     if (viewsChart) { viewsChart.destroy(); viewsChart = null; }
 
     try {
       const { history } = await apiFetch(`/api/tweets/${tweetId}/history`);
 
+      if (!history.length) {
+        return;
+      }
+
       const labels = history.map(h => {
         const d = new Date(h.recorded_at);
-        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleTimeString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
       });
-      const likes = history.map(h => h.likes);
-      const views = history.map(h => h.views);
 
-      const chartDefaults = {
-        tension: 0.4,
-        pointRadius: 3,
-        borderWidth: 2,
-        fill: true,
-      };
-
-      likesChart = new Chart(document.getElementById('likesChart'), {
+      const chartCfg = (label, data, color, bg) => ({
         type: 'line',
         data: {
           labels,
-          datasets: [{
-            ...chartDefaults,
-            label: 'Likes',
-            data: likes,
-            borderColor: '#1d9bf0',
-            backgroundColor: 'rgba(29,155,240,.1)',
-          }],
+          datasets: [{ label, data, borderColor: color, backgroundColor: bg,
+            tension: 0.4, pointRadius: 3, borderWidth: 2, fill: true }],
         },
-        options: chartOptions('Likes over time'),
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            title: { display: true, text: label, color: '#64748b', font: { size: 12 } },
+          },
+          scales: {
+            x: { ticks: { color: '#475569', maxTicksLimit: 6 }, grid: { color: '#1e2733' } },
+            y: { ticks: { color: '#475569' }, grid: { color: '#1e2733' } },
+          },
+        },
       });
 
-      viewsChart = new Chart(document.getElementById('viewsChart'), {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [{
-            ...chartDefaults,
-            label: 'Views',
-            data: views,
-            borderColor: '#22c55e',
-            backgroundColor: 'rgba(34,197,94,.08)',
-          }],
-        },
-        options: chartOptions('Views over time'),
-      });
+      likesChart = new Chart(
+        document.getElementById('likesChart'),
+        chartCfg('Likes over time', history.map(h => h.likes), '#3b82f6', 'rgba(59,130,246,.1)')
+      );
+      viewsChart = new Chart(
+        document.getElementById('viewsChart'),
+        chartCfg('Views over time', history.map(h => h.views), '#22c55e', 'rgba(34,197,94,.08)')
+      );
     } catch (err) {
       console.error('Chart error', err);
     }
   }
 
-  function chartOptions(title) {
-    return {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        title: {
-          display: true,
-          text: title,
-          color: '#777',
-          font: { size: 12 },
-        },
-      },
-      scales: {
-        x: { ticks: { color: '#555', maxTicksLimit: 8 }, grid: { color: '#1e1e1e' } },
-        y: { ticks: { color: '#555' }, grid: { color: '#1e1e1e' } },
-      },
-    };
-  }
-
   function closeModal(e) {
-    // If called from backdrop click, only close when clicking the backdrop itself
     if (e && e.target !== document.getElementById('chartModal')) return;
     document.getElementById('chartModal').classList.remove('open');
   }
 
-  // ─── Auto-refresh every 90 seconds ───────────────────────────────────────────
+  // ─── Toast ──────────────────────────────────────────────────────────────────
 
-  function startAutoRefresh() {
-    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    autoRefreshInterval = setInterval(load, 90_000);
+  function showToast(msg, type = 'ok') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `toast ${type} show`;
+    setTimeout(() => { el.className = 'toast'; }, 3000);
   }
 
-  // ─── Init ─────────────────────────────────────────────────────────────────────
+  // ─── Init ────────────────────────────────────────────────────────────────────
 
   function init() {
     load();
     loadStats();
-    startAutoRefresh();
+    autoTimer = setInterval(load, 90_000);
 
-    // Apply on Enter in text/number fields
-    ['filterAuthor', 'filterMinLikes'].forEach((id) => {
-      document.getElementById(id).addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') load();
-      });
+    ['filterAuthor', 'filterMinLikes'].forEach(id => {
+      document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') load(); });
     });
   }
 
   document.addEventListener('DOMContentLoaded', init);
 
-  return { load, reset, triggerRefresh, openChart, closeModal };
+  return { load, setTab, triggerRefresh, openChart, closeModal };
 })();
