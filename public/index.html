@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TWITTERATI — Viral Tweet Radar</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d0d0d;
+      --surface:  #161616;
+      --border:   #2a2a2a;
+      --text:     #e8e8e8;
+      --muted:    #777;
+      --accent:   #1d9bf0;
+      --green:    #22c55e;
+      --orange:   #f97316;
+      --red:      #ef4444;
+      --yellow:   #eab308;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ── Header ───────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+    .logo span { color: var(--accent); }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .last-updated { color: var(--muted); font-size: 12px; }
+    .btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .8; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-ghost   { background: transparent; border: 1px solid var(--border); color: var(--text); }
+
+    /* ── Stats bar ────────────────────────────────────────── */
+    .stats-bar {
+      display: flex;
+      gap: 12px;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      min-width: 120px;
+    }
+    .stat-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+    .stat-value { font-size: 22px; font-weight: 700; margin-top: 2px; }
+    .stat-value.parabolic { color: var(--red); }
+    .stat-value.fast      { color: var(--orange); }
+
+    /* ── Filters ──────────────────────────────────────────── */
+    .filters {
+      display: flex;
+      gap: 10px;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+    .filter-group { display: flex; flex-direction: column; gap: 4px; }
+    .filter-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    select, input[type="text"], input[type="number"] {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    select:focus, input:focus { border-color: var(--accent); }
+    .filters .btn { margin-top: auto; }
+
+    /* ── Table ────────────────────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+      padding: 0 24px 40px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+    thead th {
+      text-align: left;
+      padding: 10px 12px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .1s;
+    }
+    tbody tr:hover { background: #1a1a1a; }
+    td {
+      padding: 10px 12px;
+      vertical-align: middle;
+    }
+    .tweet-cell { max-width: 320px; }
+    .tweet-text {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .tweet-author {
+      font-size: 12px;
+      color: var(--accent);
+      margin-bottom: 3px;
+    }
+    .tweet-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 11px;
+    }
+    .tweet-link:hover { text-decoration: underline; }
+    .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .growth { white-space: nowrap; color: var(--muted); font-size: 12px; }
+    .media-badge {
+      display: inline-block;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #1e293b;
+      color: #7dd3fc;
+      text-transform: uppercase;
+    }
+
+    /* ── Status badges ────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    .badge-parabolic { background: rgba(239,68,68,.15);  color: var(--red);    border: 1px solid rgba(239,68,68,.3);  }
+    .badge-fast      { background: rgba(249,115,22,.15); color: var(--orange); border: 1px solid rgba(249,115,22,.3); }
+    .badge-normal    { background: rgba(34,197,94,.1);   color: var(--green);  border: 1px solid rgba(34,197,94,.2);  }
+
+    /* ── Chart modal ──────────────────────────────────────── */
+    .modal-backdrop {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.75);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      width: min(680px, 95vw);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+    .modal-title { font-size: 15px; font-weight: 600; }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .chart-container { position: relative; height: 220px; margin-bottom: 16px; }
+
+    /* ── Empty / loading states ────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 60px 0;
+      color: var(--muted);
+    }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Notification toast ────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 18px;
+      font-size: 13px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all .3s;
+      z-index: 300;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { border-left: 3px solid var(--green); }
+    .toast.error   { border-left: 3px solid var(--red);   }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">TWITTER<span>ATI</span> &mdash; Viral Radar</div>
+  <div class="header-right">
+    <span class="last-updated" id="lastUpdated">Loading…</span>
+    <button class="btn btn-ghost" onclick="App.triggerRefresh('refresh')">Refresh Metrics</button>
+    <button class="btn btn-primary" onclick="App.triggerRefresh('fetch')">Fetch New</button>
+  </div>
+</header>
+
+<!-- Stats bar -->
+<div class="stats-bar" id="statsBar">
+  <div class="stat-card"><div class="stat-label">Tracked</div><div class="stat-value" id="statTotal">—</div></div>
+  <div class="stat-card"><div class="stat-label">Parabolic</div><div class="stat-value parabolic" id="statParabolic">—</div></div>
+  <div class="stat-card"><div class="stat-label">Fast</div><div class="stat-value fast" id="statFast">—</div></div>
+  <div class="stat-card"><div class="stat-label">Peak Likes</div><div class="stat-value" id="statMaxLikes">—</div></div>
+  <div class="stat-card"><div class="stat-label">Peak Views</div><div class="stat-value" id="statMaxViews">—</div></div>
+</div>
+
+<!-- Filters -->
+<div class="filters">
+  <div class="filter-group">
+    <span class="filter-label">Status</span>
+    <select id="filterStatus">
+      <option value="all">All</option>
+      <option value="parabolic">Parabolic</option>
+      <option value="fast">Fast</option>
+      <option value="normal">Normal</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Sort by</span>
+    <select id="filterSort">
+      <option value="likes">Most Likes</option>
+      <option value="views">Most Views</option>
+      <option value="growth">Fastest Growth</option>
+      <option value="virality">Virality Score</option>
+      <option value="newest">Newest</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Media</span>
+    <select id="filterMedia">
+      <option value="">Any</option>
+      <option value="true">Has Media</option>
+      <option value="false">Text Only</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Min Likes</span>
+    <input type="number" id="filterMinLikes" placeholder="15000" value="15000" min="0" style="width:110px" />
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Author</span>
+    <input type="text" id="filterAuthor" placeholder="@handle" style="width:130px" />
+  </div>
+  <button class="btn btn-primary" onclick="App.load()">Apply</button>
+  <button class="btn btn-ghost" onclick="App.reset()">Reset</button>
+</div>
+
+<!-- Table -->
+<div class="table-wrap">
+  <table id="tweetTable">
+    <thead>
+      <tr>
+        <th style="width:36px">#</th>
+        <th>Tweet</th>
+        <th>Status</th>
+        <th>Likes</th>
+        <th>Retweets</th>
+        <th>Replies</th>
+        <th>Views</th>
+        <th>Likes/hr</th>
+        <th>Views/hr</th>
+        <th>Virality</th>
+        <th>Posted</th>
+        <th>Chart</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody">
+      <tr><td colspan="12"><div class="empty-state"><div class="spinner"></div>Loading…</div></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Chart modal -->
+<div class="modal-backdrop" id="chartModal" onclick="App.closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modalTitle">Growth Chart</div>
+        <a id="modalLink" href="#" target="_blank" class="tweet-link" rel="noreferrer">Open on X ↗</a>
+      </div>
+      <button class="modal-close" onclick="App.closeModal()">&times;</button>
+    </div>
+    <div class="chart-container"><canvas id="likesChart"></canvas></div>
+    <div class="chart-container"><canvas id="viewsChart"></canvas></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

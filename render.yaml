@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: twitterati
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TWITTER_BEARER_TOKEN
+        sync: false          # set manually in Render dashboard
+      - key: DATABASE_URL
+        fromDatabase:
+          name: twitterati-db
+          property: connectionString
+
+databases:
+  - name: twitterati-db
+    databaseName: twitterati
+    user: twitterati
+    plan: free
