@@ -39,10 +39,10 @@ const App = (() => {
   // ─── Badge helpers ──────────────────────────────────────────────────────────
 
   function badgeClass(status) {
-    return { parabolic: 'b-p', fast: 'b-f', normal: 'b-n' }[status] || 'b-n';
+    return { parabolic: 'b-p', fast: 'b-f', warming: 'b-w', fading: 'b-d', normal: 'b-n' }[status] || 'b-n';
   }
   function badgeLabel(status) {
-    return { parabolic: '🔥 Parabolic', fast: '⚡ Fast', normal: '✓ Normal' }[status] || status;
+    return { parabolic: '🔥 Parabolic', fast: '⚡ Fast', warming: '🌡️ Warming', fading: '💀 Fading', normal: '✓ Normal' }[status] || status;
   }
 
   // ─── Card renderer ──────────────────────────────────────────────────────────
@@ -53,16 +53,20 @@ const App = (() => {
     const url     = t.tweet_url     || '#';
     const lph     = t.likes_per_hour > 0 ? `+${fmt(t.likes_per_hour)}/hr` : null;
     const vph     = t.views_per_hour > 0 ? `+${fmt(t.views_per_hour)}/hr` : null;
+    const accel   = t.acceleration;
+    const accelStr = accel > 0 ? `▲ +${fmt(accel)}/hr²` : accel < 0 ? `▼ ${fmt(accel)}/hr²` : null;
+    const accelColor = accel > 0 ? 'color:var(--green)' : 'color:var(--gray)';
 
     const mediaTag = t.has_media
       ? `<span class="media-tag">${t.media_type || 'media'}</span><br>`
       : '';
 
-    const growthChips = (lph || vph) ? `
+    const growthChips = `
       <div class="growth-chips">
         ${lph ? `<span class="gc">▲ ${lph} likes</span>` : ''}
         ${vph ? `<span class="gc v">▲ ${vph} views</span>` : ''}
-      </div>` : '<span></span>';
+        ${accelStr ? `<span class="gc" style="${accelColor};font-size:11px">${accelStr}</span>` : ''}
+      </div>`;
 
     return `
       <div class="card ${t.status}" data-id="${t.tweet_id}">
@@ -109,8 +113,8 @@ const App = (() => {
       document.getElementById('statTotal').textContent     = fmt(stats.total_tweets);
       document.getElementById('statParabolic').textContent = fmt(stats.parabolic_count);
       document.getElementById('statFast').textContent      = fmt(stats.fast_count);
-      document.getElementById('statMaxLikes').textContent  = fmt(stats.max_likes);
-      document.getElementById('statMaxViews').textContent  = fmt(stats.max_views);
+      document.getElementById('statWarming').textContent   = fmt(stats.warming_count);
+      document.getElementById('statMaxAccel').textContent  = fmt(stats.max_acceleration);
 
       const dot = document.getElementById('footDot');
       const footStatus = document.getElementById('footStatus');
@@ -133,12 +137,14 @@ const App = (() => {
   // ─── Tab counts ─────────────────────────────────────────────────────────────
 
   function updateTabCounts(tweets) {
-    const counts = { all: tweets.length, parabolic: 0, fast: 0, normal: 0 };
+    const counts = { all: tweets.length, parabolic: 0, fast: 0, warming: 0, normal: 0, fading: 0 };
     for (const t of tweets) counts[t.status] = (counts[t.status] || 0) + 1;
     document.getElementById('tcAll').textContent       = counts.all;
     document.getElementById('tcParabolic').textContent = counts.parabolic;
     document.getElementById('tcFast').textContent      = counts.fast;
+    document.getElementById('tcWarming').textContent   = counts.warming;
     document.getElementById('tcNormal').textContent    = counts.normal;
+    document.getElementById('tcFading').textContent    = counts.fading;
   }
 
   // ─── Main load ──────────────────────────────────────────────────────────────

@@ -18,11 +18,19 @@ CREATE TABLE IF NOT EXISTS tweets (
   has_media       BOOLEAN NOT NULL DEFAULT FALSE,
   media_type      TEXT,
   -- Growth fields updated by scheduler
-  status          TEXT NOT NULL DEFAULT 'normal',  -- normal | fast | parabolic
+  status          TEXT NOT NULL DEFAULT 'normal',  -- normal | warming | fast | parabolic | fading
   likes_per_hour  NUMERIC NOT NULL DEFAULT 0,
   views_per_hour  NUMERIC NOT NULL DEFAULT 0,
+  acceleration    NUMERIC NOT NULL DEFAULT 0,       -- change in likes_per_hour over last interval
+  engagement_rate NUMERIC NOT NULL DEFAULT 0,       -- likes/views * 100
+  rt_ratio        NUMERIC NOT NULL DEFAULT 0,       -- retweets/likes * 100
   virality_score  NUMERIC NOT NULL DEFAULT 0
 );
+
+-- Migrate existing DBs: add new columns if they don't exist yet
+ALTER TABLE tweets ADD COLUMN IF NOT EXISTS acceleration    NUMERIC NOT NULL DEFAULT 0;
+ALTER TABLE tweets ADD COLUMN IF NOT EXISTS engagement_rate NUMERIC NOT NULL DEFAULT 0;
+ALTER TABLE tweets ADD COLUMN IF NOT EXISTS rt_ratio        NUMERIC NOT NULL DEFAULT 0;
 
 -- Time-series snapshots for growth calculation
 CREATE TABLE IF NOT EXISTS tweet_snapshots (
@@ -42,3 +50,4 @@ CREATE INDEX IF NOT EXISTS idx_tweets_status          ON tweets(status);
 CREATE INDEX IF NOT EXISTS idx_tweets_posted_at       ON tweets(posted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tweets_likes           ON tweets(likes DESC);
 CREATE INDEX IF NOT EXISTS idx_tweets_virality        ON tweets(virality_score DESC);
+CREATE INDEX IF NOT EXISTS idx_tweets_acceleration    ON tweets(acceleration DESC);
