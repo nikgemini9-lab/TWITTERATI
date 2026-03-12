@@ -50,10 +50,17 @@ function tweetToMetrics(tweet) {
   };
 }
 
+// Ultra-common words that together cover essentially any tweet in any topic.
+// Twitter Advanced Search requires at least one keyword — without this the
+// query is just "min_faves:800 since:..." which returns 0 results.
+// optionalWords generates: (the OR a OR i OR is OR ...) → matches everything.
+const BROAD_WORDS = ['the', 'a', 'i', 'is', 'it', 'to', 'of', 'in', 'you', 'and'];
+
 // ─── Fetch new viral tweets via search ───────────────────────────────────────
 //
-// Uses ITweetFilter.minLikes + startDate to hit Twitter Advanced Search.
-// Rettiwt returns at most 20 tweets per call; we paginate up to MAX_PAGES.
+// Uses ITweetFilter.minLikes + startDate + optionalWords to hit Twitter
+// Advanced Search. Rettiwt returns at most 20 tweets per call; we paginate
+// up to MAX_PAGES.
 
 async function fetchViralTweets() {
   const client    = getClient();
@@ -62,7 +69,8 @@ async function fetchViralTweets() {
   const filter = {
     minLikes:     MIN_LIKES,
     startDate,
-    onlyOriginal: true,   // exclude retweets
+    optionalWords: BROAD_WORDS,  // required — Twitter ignores metric-only queries
+    onlyOriginal: true,           // exclude retweets
   };
 
   let processed = 0;
