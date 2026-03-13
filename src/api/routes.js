@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { getTweets, getTweetHistory, getStats } = require('../db/queries');
+const { getTweets, getTweetHistory, getStats, getBlacklist, addToBlacklist, removeFromBlacklist } = require('../db/queries');
 const { runFetch, runRefresh, state } = require('../scheduler');
 const config = require('../config');
 
@@ -57,6 +57,37 @@ router.get('/stats', async (req, res) => {
     });
   } catch (err) {
     console.error('[API] GET /stats:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── Blacklist endpoints ──────────────────────────────────────────────────────
+
+router.get('/blacklist', async (req, res) => {
+  try {
+    const list = await getBlacklist();
+    res.json({ ok: true, blacklist: list });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+router.post('/blacklist', async (req, res) => {
+  const handle = (req.body?.handle || '').trim();
+  if (!handle) return res.status(400).json({ ok: false, error: 'handle required' });
+  try {
+    await addToBlacklist(handle);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+router.delete('/blacklist/:handle', async (req, res) => {
+  try {
+    await removeFromBlacklist(req.params.handle);
+    res.json({ ok: true });
+  } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
 });

@@ -281,11 +281,19 @@ async function getTweets(filters = {}) {
     params.push(filters.status);
   }
 
-  if (filters.has_media === 'true') {
-    conditions.push(`has_media = true`);
-  } else if (filters.has_media === 'false') {
+  // media filter: photo | video | gif | any_media | text  (also legacy has_media=true/false)
+  const media = filters.media || (filters.has_media === 'true' ? 'any_media' : filters.has_media === 'false' ? 'text' : '');
+  if (media === 'text') {
     conditions.push(`has_media = false`);
+  } else if (media === 'any_media') {
+    conditions.push(`has_media = true`);
+  } else if (media === 'photo' || media === 'video' || media === 'gif') {
+    conditions.push(`media_type = $${idx++}`);
+    params.push(media);
   }
+
+  // Always exclude blacklisted handles
+  conditions.push(`author_handle NOT IN (SELECT handle FROM blacklist)`);
 
   if (filters.min_likes) {
     conditions.push(`likes >= $${idx++}`);
@@ -366,6 +374,23 @@ async function cleanup() {
   await db.query(`DELETE FROM tweets WHERE posted_at < NOW() - INTERVAL '7 days'`);
 }
 
+// ─── Blacklist CRUD ───────────────────────────────────────────────────────────
+
+async function getBlacklist() {
+  const { rows } = await db.query(`SELECT handle, added_at FROM blacklist ORDER BY added_at DESC`);
+  return rows;
+}
+
+async function addToBlacklist(handle) {
+  const h = handle.replace(/^@/, '').toLowerCase().trim();
+  await db.query(`INSERT INTO blacklist (handle) VALUES ($1) ON CONFLICT DO NOTHING`, [h]);
+}
+
+async function removeFromBlacklist(handle) {
+  const h = handle.replace(/^@/, '').toLowerCase().trim();
+  await db.query(`DELETE FROM blacklist WHERE handle = $1`, [h]);
+}
+
 module.exports = {
   upsertTweet,
   insertSnapshot,
@@ -375,4 +400,7 @@ module.exports = {
   getTweetHistory,
   getStats,
   cleanup,
+  getBlacklist,
+  addToBlacklist,
+  removeFromBlacklist,
 };

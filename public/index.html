@@ -277,8 +277,11 @@
   <div class="tg"><span class="tl">Media</span>
     <select id="filterMedia">
       <option value="">Any</option>
-      <option value="true">Has Media</option>
-      <option value="false">Text Only</option>
+      <option value="any_media">Photo / Video</option>
+      <option value="photo">Photo only</option>
+      <option value="video">Video only</option>
+      <option value="gif">GIF only</option>
+      <option value="text">Text only</option>
     </select>
   </div>
   <div class="tg"><span class="tl">Min Likes</span>
@@ -288,6 +291,7 @@
     <input type="text" id="filterAuthor" placeholder="@handle" style="width:110px" />
   </div>
   <button class="btn btn-primary" onclick="App.load()">Apply</button>
+  <button class="btn btn-ghost" onclick="App.openBlacklist()" title="Manage blacklisted handles">🚫 Blacklist</button>
 
   <div class="ms-auto" style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap">
     <div class="tg">
@@ -340,6 +344,24 @@
       <tr><td colspan="14"><div class="state-box"><div class="spinner"></div><p>Loading…</p></div></td></tr>
     </tbody>
   </table>
+</div>
+
+<!-- Blacklist modal -->
+<div class="modal-bd" id="blacklistModal" onclick="if(event.target===this)App.closeBlacklist()">
+  <div class="modal" style="width:min(440px,95vw)">
+    <div class="modal-hd">
+      <div>
+        <div class="modal-title">🚫 Blacklisted Handles</div>
+        <div class="modal-sub">These authors are hidden from the dashboard</div>
+      </div>
+      <button class="modal-x" onclick="App.closeBlacklist()">&times;</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input id="blacklistInput" type="text" placeholder="@handle" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--fg);font-size:13px" />
+      <button class="btn btn-primary" onclick="App.addBlacklistFromInput()" style="height:34px">Add</button>
+    </div>
+    <div id="blacklistBody"></div>
+  </div>
 </div>
 
 <!-- Chart modal -->

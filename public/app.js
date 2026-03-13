@@ -10,6 +10,7 @@ const App = (() => {
   let allTweets    = [];
   let maxVScore    = 1;   // for the V-score bar scaling
   let englishOnly  = false;
+  let blacklist    = new Set();  // lowercase handles
 
   // ─── Formatters ──────────────────────────────────────────────────────────────
 
@@ -156,6 +157,7 @@ const App = (() => {
       <td class="action-cell">
         <button class="cbtn" onclick="App.openChart('${t.tweet_id}','${esc(handle)}','${esc(url)}')">Chart</button>
         <a class="cbtn open" href="${esc(url)}" target="_blank" rel="noreferrer">↗</a>
+        <button class="cbtn block-btn" title="Blacklist ${esc(handle)}" onclick="App.blockHandle('${esc(t.author_handle)}')">🚫</button>
       </td>
     </tr>`;
   }
@@ -295,7 +297,7 @@ const App = (() => {
       const sortKey = sort.includes(':') ? sort : (sortDir === 'asc' ? `${sort}:asc` : sort);
       p.set('sort', sortKey);
     }
-    if (media)    p.set('has_media', media);
+    if (media)    p.set('media', media);
     if (minLikes) p.set('min_likes', minLikes);
     if (author)   p.set('author',    author.replace(/^@/, ''));
     p.set('limit', '1000');
@@ -497,6 +499,78 @@ const App = (() => {
     document.getElementById('chartModal').classList.remove('open');
   }
 
+  // ─── Blacklist ────────────────────────────────────────────────────────────────
+
+  async function loadBlacklist() {
+    try {
+      const { blacklist: list } = await apiFetch('/api/blacklist');
+      blacklist = new Set(list.map(r => r.handle.toLowerCase()));
+    } catch (_) {}
+  }
+
+  async function blockHandle(handle) {
+    const h = handle.replace(/^@/, '').toLowerCase();
+    if (!h) return;
+    try {
+      await fetch('/api/blacklist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: h }),
+      });
+      blacklist.add(h);
+      showToast(`@${h} blacklisted`, 'ok');
+      load();
+      renderBlacklistModal();
+    } catch (err) {
+      showToast('Failed: ' + err.message, 'err');
+    }
+  }
+
+  async function unblockHandle(handle) {
+    const h = handle.replace(/^@/, '').toLowerCase();
+    try {
+      await fetch(`/api/blacklist/${encodeURIComponent(h)}`, { method: 'DELETE' });
+      blacklist.delete(h);
+      showToast(`@${h} removed from blacklist`, 'inf');
+      load();
+      renderBlacklistModal();
+    } catch (err) {
+      showToast('Failed: ' + err.message, 'err');
+    }
+  }
+
+  function renderBlacklistModal() {
+    const list = [...blacklist].sort();
+    const el   = document.getElementById('blacklistBody');
+    if (!el) return;
+    if (!list.length) {
+      el.innerHTML = '<p style="color:var(--muted);font-size:12px;text-align:center;padding:16px 0">No handles blacklisted yet.</p>';
+      return;
+    }
+    el.innerHTML = list.map(h => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;color:var(--fg)">@${esc(h)}</span>
+        <button class="cbtn" onclick="App.unblockHandle('${esc(h)}')" style="color:var(--red);border-color:var(--red)">Remove</button>
+      </div>`).join('');
+  }
+
+  function openBlacklist() {
+    renderBlacklistModal();
+    document.getElementById('blacklistModal').classList.add('open');
+  }
+
+  function closeBlacklist() {
+    document.getElementById('blacklistModal').classList.remove('open');
+  }
+
+  async function addBlacklistFromInput() {
+    const inp = document.getElementById('blacklistInput');
+    const val = (inp?.value || '').trim();
+    if (!val) return;
+    await blockHandle(val);
+    if (inp) inp.value = '';
+  }
+
   // ─── Toast ────────────────────────────────────────────────────────────────────
 
   function showToast(msg, type = 'ok') {
@@ -512,13 +586,15 @@ const App = (() => {
     load();
     loadStats();
     loadConfig();
+    loadBlacklist();
     autoTimer = setInterval(load, 90_000);
     ['filterAuthor', 'filterMinLikes'].forEach(id => {
       document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') load(); });
     });
+    document.getElementById('blacklistInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') addBlacklistFromInput(); });
   }
 
   document.addEventListener('DOMContentLoaded', init);
 
-  return { load, setTab, setSortAndLoad, triggerRefresh, openChart, closeModal, applySearchThreshold, toggleEnglish };
+  return { load, setTab, setSortAndLoad, triggerRefresh, openChart, closeModal, applySearchThreshold, toggleEnglish, blockHandle, unblockHandle, openBlacklist, closeBlacklist, addBlacklistFromInput };
 })();

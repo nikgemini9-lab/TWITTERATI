@@ -51,3 +51,9 @@ CREATE INDEX IF NOT EXISTS idx_tweets_posted_at       ON tweets(posted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tweets_likes           ON tweets(likes DESC);
 CREATE INDEX IF NOT EXISTS idx_tweets_virality        ON tweets(virality_score DESC);
 CREATE INDEX IF NOT EXISTS idx_tweets_acceleration    ON tweets(acceleration DESC);
+
+-- Handle blacklist (display-side filter; crawling continues unaffected)
+CREATE TABLE IF NOT EXISTS blacklist (
+  handle    TEXT PRIMARY KEY,
+  added_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
