@@ -41,11 +41,16 @@ const App = (() => {
 
   // ─── English-only helpers ────────────────────────────────────────────────────
 
-  // Returns false if > 15% of characters are non-ASCII (Japanese, Chinese, Arabic, etc.)
+  // Returns false for non-English tweets:
+  //   - >15% non-ASCII chars catches Japanese, Chinese, Korean, Arabic, etc.
+  //   - Turkish marker chars (ğ/Ğ = unique to Turkish; ı/İ = dotless/dotted i,
+  //     unique to Turkish) catch Turkish tweets that otherwise look Latin
   function isLikelyEnglish(text) {
     if (!text) return true;
     const nonAscii = (text.match(/[^\x00-\x7F]/g) || []).length;
-    return (nonAscii / text.length) < 0.15;
+    if ((nonAscii / text.length) >= 0.15) return false;
+    if (/[ğĞıİ]/.test(text)) return false;
+    return true;
   }
 
   function syncEnglishBtn() {
