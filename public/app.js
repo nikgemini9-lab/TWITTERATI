@@ -285,7 +285,7 @@ const App = (() => {
     if (media)    p.set('has_media', media);
     if (minLikes) p.set('min_likes', minLikes);
     if (author)   p.set('author',    author.replace(/^@/, ''));
-    p.set('limit', '200');
+    p.set('limit', '1000');
     return p.toString();
   }
 

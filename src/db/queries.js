@@ -308,7 +308,7 @@ async function getTweets(filters = {}) {
   };
   const orderBy = sortMap[filters.sort] || 'acceleration DESC, likes_per_hour DESC';
 
-  const limit = Math.min(parseInt(filters.limit, 10) || 100, 500);
+  const limit = Math.min(parseInt(filters.limit, 10) || 1000, 5000);
 
   const { rows } = await db.query(
     `SELECT * FROM tweets WHERE ${conditions.join(' AND ')} ORDER BY ${orderBy} LIMIT ${limit}`,
