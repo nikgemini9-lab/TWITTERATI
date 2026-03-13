@@ -1,9 +1,6 @@
 const { getClient } = require('./client');
 const { upsertTweet, insertSnapshot, getTweetIdsForRefresh, recalculateGrowth } = require('../db/queries');
-
-const MIN_LIKES   = parseInt(process.env.MIN_LIKES, 10)  || 800;  // low enough to catch early, high enough to cut noise
-const HOURS_BACK  = parseInt(process.env.HOURS_BACK, 10) || 2;    // 2-hour window to measure acceleration
-const MAX_PAGES   = parseInt(process.env.MAX_PAGES, 10)  || 10;   // 10 × 20 = 200 tweets max
+const config = require('../config');
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -64,13 +61,13 @@ const BROAD_WORDS = ['the', 'a', 'i', 'is', 'it', 'to', 'of', 'in', 'you', 'and'
 
 async function fetchViralTweets() {
   const client    = getClient();
-  const startDate = new Date(Date.now() - HOURS_BACK * 60 * 60 * 1000);
+  const startDate = new Date(Date.now() - config.hoursBack * 60 * 60 * 1000);
 
   const filter = {
-    minLikes:     MIN_LIKES,
+    minLikes:      config.minLikes,
     startDate,
     optionalWords: BROAD_WORDS,  // required — Twitter ignores metric-only queries
-    onlyOriginal: true,           // exclude retweets
+    onlyOriginal:  true,          // exclude retweets
   };
 
   let processed = 0;
@@ -105,7 +102,7 @@ async function fetchViralTweets() {
     if (cursor && page < MAX_PAGES) {
       await sleep(500);
     }
-  } while (cursor && page < MAX_PAGES);
+  } while (cursor && page < config.maxPages);
 
   console.log(`[Twitter] fetchViralTweets → ${processed} tweets upserted (${page} pages)`);
   return processed;

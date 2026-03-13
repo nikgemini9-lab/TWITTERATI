@@ -269,6 +269,38 @@ const App = (() => {
     load();
   }
 
+  // ─── Search threshold ────────────────────────────────────────────────────────
+
+  async function loadConfig() {
+    try {
+      const { config } = await apiFetch('/api/config');
+      const el = document.getElementById('searchMinLikes');
+      if (el && config.minLikes) el.value = config.minLikes;
+    } catch (_) {}
+  }
+
+  async function applySearchThreshold() {
+    const val = parseInt(document.getElementById('searchMinLikes').value, 10);
+    if (!val || val < 1) { showToast('Enter a valid number', 'err'); return; }
+
+    try {
+      const res  = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ minLikes: val }),
+      });
+      const data = await res.json();
+      if (!data.ok) { showToast('Failed: ' + data.error, 'err'); return; }
+      showToast(`Search threshold set to ${val.toLocaleString()} likes — fetching…`, 'ok');
+      // Also sync the DB filter input
+      document.getElementById('filterMinLikes').value = val;
+      // Kick off a new fetch so the new threshold takes effect immediately
+      await triggerRefresh('fetch');
+    } catch (err) {
+      showToast('Failed: ' + err.message, 'err');
+    }
+  }
+
   // ─── Manual refresh ─────────────────────────────────────────────────────────
 
   async function triggerRefresh(type) {
@@ -360,6 +392,7 @@ const App = (() => {
   function init() {
     load();
     loadStats();
+    loadConfig();
     autoTimer = setInterval(load, 90_000);
 
     ['filterAuthor', 'filterMinLikes'].forEach(id => {
@@ -369,5 +402,5 @@ const App = (() => {
 
   document.addEventListener('DOMContentLoaded', init);
 
-  return { load, setTab, triggerRefresh, openChart, closeModal };
+  return { load, setTab, triggerRefresh, openChart, closeModal, applySearchThreshold };
 })();

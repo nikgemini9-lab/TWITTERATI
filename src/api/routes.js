@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const { getTweets, getTweetHistory, getStats } = require('../db/queries');
 const { runFetch, runRefresh, state } = require('../scheduler');
+const config = require('../config');
 
 const router = Router();
 
@@ -58,6 +59,35 @@ router.get('/stats', async (req, res) => {
     console.error('[API] GET /stats:', err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+// ─── GET /api/config ──────────────────────────────────────────────────────────
+
+router.get('/config', (req, res) => {
+  res.json({ ok: true, config });
+});
+
+// ─── POST /api/config ─────────────────────────────────────────────────────────
+// Body: { minLikes?: number, hoursBack?: number }
+// Updates runtime search parameters without restarting.
+
+router.post('/config', (req, res) => {
+  const { minLikes, hoursBack } = req.body || {};
+
+  if (minLikes !== undefined) {
+    const v = parseInt(minLikes, 10);
+    if (isNaN(v) || v < 1) return res.status(400).json({ ok: false, error: 'minLikes must be a positive integer' });
+    config.minLikes = v;
+  }
+
+  if (hoursBack !== undefined) {
+    const v = parseInt(hoursBack, 10);
+    if (isNaN(v) || v < 1) return res.status(400).json({ ok: false, error: 'hoursBack must be a positive integer' });
+    config.hoursBack = v;
+  }
+
+  console.log(`[Config] Updated: minLikes=${config.minLikes} hoursBack=${config.hoursBack}`);
+  res.json({ ok: true, config });
 });
 
 // ─── POST /api/refresh ────────────────────────────────────────────────────────
