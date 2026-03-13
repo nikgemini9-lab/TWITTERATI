@@ -1,27 +1,28 @@
 const { Rettiwt } = require('rettiwt-api');
 
-let _client = null;
+let _client    = null;
+let _cachedKey = null;   // track which key the client was built with
 
 function getClient() {
-  if (_client) return _client;
+  // Rebuild the client if the env var changed (e.g. after a hot env update)
+  const apiKey = (process.env.RETTIWT_API_KEY || '').trim();
 
-  const apiKey = process.env.RETTIWT_API_KEY;
+  if (_client && _cachedKey === apiKey) return _client;
 
-  // apiKey is optional – Rettiwt works in guest mode without one,
-  // but guest mode has stricter limits and may not return viewCount.
-  // For reliable viewCount and higher limits, provide an API key.
-  const config = {
-    delay: parseInt(process.env.REQUEST_DELAY_MS, 10) || 1000,
+  const cfg = {
+    delay:   parseInt(process.env.REQUEST_DELAY_MS, 10) || 1000,
     logging: process.env.RETTIWT_LOGGING === 'true',
   };
 
   if (apiKey) {
-    config.apiKey = apiKey;
+    cfg.apiKey = apiKey;
+    console.log('[Twitter] Building Rettiwt client with API key');
   } else {
     console.warn('[Twitter] RETTIWT_API_KEY not set – running in guest mode');
   }
 
-  _client = new Rettiwt(config);
+  _client    = new Rettiwt(cfg);
+  _cachedKey = apiKey;
   return _client;
 }
 
