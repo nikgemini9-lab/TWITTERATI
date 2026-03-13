@@ -1,13 +1,14 @@
 /* global Chart */
 
 const App = (() => {
-  let activeTab  = 'all';
-  let activeSort = 'virality';
-  let autoTimer  = null;
-  let likesChart = null;
-  let viewsChart = null;
-  let allTweets  = [];
-  let maxVScore  = 1;   // for the V-score bar scaling
+  let activeTab    = 'all';
+  let activeSort   = 'virality';
+  let autoTimer    = null;
+  let likesChart   = null;
+  let viewsChart   = null;
+  let allTweets    = [];
+  let maxVScore    = 1;   // for the V-score bar scaling
+  let englishOnly  = false;
 
   // ─── Formatters ──────────────────────────────────────────────────────────────
 
@@ -36,6 +37,22 @@ const App = (() => {
 
   function avatarLetter(handle) {
     return (handle || '?').replace('@', '')[0]?.toUpperCase() || '?';
+  }
+
+  // ─── English-only helpers ────────────────────────────────────────────────────
+
+  // Returns false if > 15% of characters are non-ASCII (Japanese, Chinese, Arabic, etc.)
+  function isLikelyEnglish(text) {
+    if (!text) return true;
+    const nonAscii = (text.match(/[^\x00-\x7F]/g) || []).length;
+    return (nonAscii / text.length) < 0.15;
+  }
+
+  function syncEnglishBtn() {
+    const btn = document.getElementById('btnEnglishOnly');
+    if (!btn) return;
+    if (englishOnly) btn.classList.add('on');
+    else             btn.classList.remove('on');
   }
 
   // ─── Badge ───────────────────────────────────────────────────────────────────
@@ -257,10 +274,11 @@ const App = (() => {
     tbody.innerHTML = `<tr><td colspan="14"><div class="state-box"><div class="spinner"></div><p>Loading…</p></div></td></tr>`;
 
     try {
-      const { tweets, count } = await apiFetch(`/api/tweets?${buildQuery()}`);
+      let { tweets, count } = await apiFetch(`/api/tweets?${buildQuery()}`);
+      if (englishOnly) tweets = tweets.filter(t => isLikelyEnglish(t.tweet_text));
       allTweets = tweets;
       updateTabCounts(tweets);
-      document.getElementById('footCount').textContent = `${count} tweets shown`;
+      document.getElementById('footCount').textContent = `${tweets.length} tweets shown${englishOnly ? ' (EN only)' : ''}`;
 
       if (!tweets.length) {
         const stats = await loadStats();
@@ -303,10 +321,13 @@ const App = (() => {
   async function loadConfig() {
     try {
       const { config } = await apiFetch('/api/config');
-      if (config.minLikes)              document.getElementById('searchMinLikes').value    = config.minLikes;
+      if (config.minLikes)                  document.getElementById('searchMinLikes').value    = config.minLikes;
       if (config.minRetweets !== undefined) document.getElementById('searchMinRetweets').value = config.minRetweets;
       // Also sync display filter
       document.getElementById('filterMinLikes').value = config.minLikes || 10000;
+      // Sync English toggle
+      englishOnly = config.language === 'en';
+      syncEnglishBtn();
     } catch (_) {}
   }
 
@@ -328,6 +349,36 @@ const App = (() => {
       await triggerRefresh('fetch');
     } catch (err) {
       showToast('Failed: ' + err.message, 'err');
+    }
+  }
+
+  // ─── English-only toggle ─────────────────────────────────────────────────────
+
+  async function toggleEnglish() {
+    englishOnly = !englishOnly;
+    syncEnglishBtn();
+
+    try {
+      const res  = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: englishOnly ? 'en' : null }),
+      });
+      const data = await res.json();
+      if (!data.ok) { showToast('Failed: ' + data.error, 'err'); return; }
+
+      if (englishOnly) {
+        showToast('English only — filtering display & next fetch will use lang:en', 'ok');
+      } else {
+        showToast('All languages enabled', 'inf');
+      }
+
+      // Re-render current tweets with new filter (instant visual feedback)
+      load();
+    } catch (err) {
+      showToast('Failed: ' + err.message, 'err');
+      englishOnly = !englishOnly;   // revert on error
+      syncEnglishBtn();
     }
   }
 
@@ -418,5 +469,5 @@ const App = (() => {
 
   document.addEventListener('DOMContentLoaded', init);
 
-  return { load, setTab, setSortAndLoad, triggerRefresh, openChart, closeModal, applySearchThreshold };
+  return { load, setTab, setSortAndLoad, triggerRefresh, openChart, closeModal, applySearchThreshold, toggleEnglish };
 })();

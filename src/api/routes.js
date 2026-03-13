@@ -72,7 +72,7 @@ router.get('/config', (req, res) => {
 // Updates runtime search parameters without restarting.
 
 router.post('/config', (req, res) => {
-  const { minLikes, minRetweets } = req.body || {};
+  const { minLikes, minRetweets, language } = req.body || {};
 
   if (minLikes !== undefined) {
     const v = parseInt(minLikes, 10);
@@ -86,7 +86,12 @@ router.post('/config', (req, res) => {
     config.minRetweets = v;
   }
 
-  console.log(`[Config] Updated: minLikes=${config.minLikes} minRetweets=${config.minRetweets}`);
+  if (language !== undefined) {
+    // Accept 'en', any ISO 639-1 code, or null/empty to clear
+    config.language = language || null;
+  }
+
+  console.log(`[Config] Updated: minLikes=${config.minLikes} minRetweets=${config.minRetweets} language=${config.language || 'any'}`);
   res.json({ ok: true, config });
 });
 
