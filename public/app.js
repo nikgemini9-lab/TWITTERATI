@@ -274,27 +274,26 @@ const App = (() => {
   async function loadConfig() {
     try {
       const { config } = await apiFetch('/api/config');
-      const el = document.getElementById('searchMinLikes');
-      if (el && config.minLikes) el.value = config.minLikes;
+      if (config.minLikes)    document.getElementById('searchMinLikes').value    = config.minLikes;
+      if (config.minRetweets !== undefined) document.getElementById('searchMinRetweets').value = config.minRetweets;
     } catch (_) {}
   }
 
   async function applySearchThreshold() {
-    const val = parseInt(document.getElementById('searchMinLikes').value, 10);
-    if (!val || val < 1) { showToast('Enter a valid number', 'err'); return; }
+    const likes = parseInt(document.getElementById('searchMinLikes').value, 10);
+    const rts   = parseInt(document.getElementById('searchMinRetweets').value, 10) || 0;
+    if (!likes || likes < 1) { showToast('Enter a valid min_faves number', 'err'); return; }
 
     try {
       const res  = await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ minLikes: val }),
+        body: JSON.stringify({ minLikes: likes, minRetweets: rts }),
       });
       const data = await res.json();
       if (!data.ok) { showToast('Failed: ' + data.error, 'err'); return; }
-      showToast(`Search threshold set to ${val.toLocaleString()} likes — fetching…`, 'ok');
-      // Also sync the DB filter input
-      document.getElementById('filterMinLikes').value = val;
-      // Kick off a new fetch so the new threshold takes effect immediately
+      showToast(`Search: min_faves:${likes.toLocaleString()}${rts > 0 ? ` min_retweets:${rts}` : ''} — fetching…`, 'ok');
+      document.getElementById('filterMinLikes').value = likes;
       await triggerRefresh('fetch');
     } catch (err) {
       showToast('Failed: ' + err.message, 'err');

@@ -340,12 +340,14 @@
   <button class="btn btn-primary" onclick="App.load()">Apply</button>
   <div class="ms-auto" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
     <div class="tg">
-      <span class="tl" style="color:var(--orange)">Search threshold ⚡</span>
-      <div style="display:flex;gap:4px">
-        <input type="number" id="searchMinLikes" min="100" step="500" style="width:100px" placeholder="3000" />
-        <button class="btn btn-ghost" onclick="App.applySearchThreshold()" style="padding:0 10px">Set &amp; Fetch</button>
-      </div>
+      <span class="tl" style="color:var(--orange)">Search ⚡ min_faves</span>
+      <input type="number" id="searchMinLikes" min="100" step="1000" style="width:100px" placeholder="10000" />
     </div>
+    <div class="tg">
+      <span class="tl" style="color:var(--orange)">min_retweets</span>
+      <input type="number" id="searchMinRetweets" min="0" step="100" style="width:90px" placeholder="0" />
+    </div>
+    <button class="btn btn-ghost" onclick="App.applySearchThreshold()" style="align-self:flex-end">Set &amp; Fetch</button>
     <button class="btn btn-ghost" onclick="App.triggerRefresh('refresh')">Refresh Metrics</button>
     <button class="btn btn-primary" onclick="App.triggerRefresh('fetch')">Fetch New</button>
   </div>

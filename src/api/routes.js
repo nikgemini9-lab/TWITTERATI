@@ -72,7 +72,7 @@ router.get('/config', (req, res) => {
 // Updates runtime search parameters without restarting.
 
 router.post('/config', (req, res) => {
-  const { minLikes, hoursBack } = req.body || {};
+  const { minLikes, minRetweets } = req.body || {};
 
   if (minLikes !== undefined) {
     const v = parseInt(minLikes, 10);
@@ -80,13 +80,13 @@ router.post('/config', (req, res) => {
     config.minLikes = v;
   }
 
-  if (hoursBack !== undefined) {
-    const v = parseInt(hoursBack, 10);
-    if (isNaN(v) || v < 1) return res.status(400).json({ ok: false, error: 'hoursBack must be a positive integer' });
-    config.hoursBack = v;
+  if (minRetweets !== undefined) {
+    const v = parseInt(minRetweets, 10);
+    if (isNaN(v) || v < 0) return res.status(400).json({ ok: false, error: 'minRetweets must be >= 0' });
+    config.minRetweets = v;
   }
 
-  console.log(`[Config] Updated: minLikes=${config.minLikes} hoursBack=${config.hoursBack}`);
+  console.log(`[Config] Updated: minLikes=${config.minLikes} minRetweets=${config.minRetweets}`);
   res.json({ ok: true, config });
 });
 

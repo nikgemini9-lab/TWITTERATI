@@ -3,9 +3,9 @@
 // without restarting the server.
 
 const config = {
-  minLikes:  parseInt(process.env.MIN_LIKES,  10) || 3000,
-  hoursBack: parseInt(process.env.HOURS_BACK, 10) || 24,  // 24h window — viral tweets take hours to accumulate likes
-  maxPages:  parseInt(process.env.MAX_PAGES,  10) || 10,
+  minLikes:    parseInt(process.env.MIN_LIKES,    10) || 10000,
+  minRetweets: parseInt(process.env.MIN_RETWEETS, 10) || 0,
+  maxPages:    parseInt(process.env.MAX_PAGES,    10) || 10,
 };
 
 module.exports = config;

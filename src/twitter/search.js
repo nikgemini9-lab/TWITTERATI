@@ -47,28 +47,21 @@ function tweetToMetrics(tweet) {
   };
 }
 
-// Ultra-common words that together cover essentially any tweet in any topic.
-// Twitter Advanced Search requires at least one keyword — without this the
-// query is just "min_faves:800 since:..." which returns 0 results.
-// optionalWords generates: (the OR a OR i OR is OR ...) → matches everything.
-const BROAD_WORDS = ['the', 'a', 'i', 'is', 'it', 'to', 'of', 'in', 'you', 'and'];
-
 // ─── Fetch new viral tweets via search ───────────────────────────────────────
 //
-// Uses ITweetFilter.minLikes + startDate + optionalWords to hit Twitter
-// Advanced Search. Rettiwt returns at most 20 tweets per call; we paginate
-// up to MAX_PAGES.
+// Equivalent to: min_faves:X -filter:replies [min_retweets:Y]
+// No date/keyword filters — keep it identical to what works manually.
 
 async function fetchViralTweets() {
-  const client    = getClient();
-  const startDate = new Date(Date.now() - config.hoursBack * 60 * 60 * 1000);
+  const client = getClient();
 
   const filter = {
-    minLikes:      config.minLikes,
-    startDate,
-    optionalWords: BROAD_WORDS,  // required — Twitter ignores metric-only queries
-    onlyOriginal:  true,          // exclude retweets
+    minLikes:    config.minLikes,
+    onlyOriginal: true,                                           // -filter:replies
+    ...(config.minRetweets > 0 && { minRetweets: config.minRetweets }),
   };
+
+  console.log(`[Twitter] search filter: min_faves:${config.minLikes}${config.minRetweets > 0 ? ` min_retweets:${config.minRetweets}` : ''} -filter:replies`);
 
   let processed = 0;
   let cursor    = undefined;
