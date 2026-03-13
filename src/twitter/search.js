@@ -55,17 +55,17 @@ function tweetToMetrics(tweet) {
 async function fetchViralTweets() {
   const client = getClient();
 
-  // Anchor the search to the last 15 minutes.
+  // Anchor the search to the last 45 minutes.
   //
   // Without startDate, Twitter returns results in RELEVANCE order (not newest
-  // first). Our 200-tweet budget (10 pages × 20) gets filled by tweets from
-  // large verified accounts that score highest in Twitter's algorithm — a tweet
-  // from a small account like @trapbass_ with 22K likes gets buried and never
-  // appears in our results even though it passed the min_faves threshold.
+  // first), which buries small accounts behind large verified ones even when
+  // their tweet passes the min_faves threshold.
   //
-  // With startDate = now - 15min, every slot is a fresh tweet from the last
-  // fetch window. Nothing older competes for those slots.
-  const startDate = new Date(Date.now() - 15 * 60 * 1000);
+  // With startDate, Twitter returns results newest-first within that window.
+  // We use 45 min (4.5× the 10-min cron interval) so "slow burner" tweets
+  // — posted 20-40 min ago and only now crossing the like threshold — are
+  // always caught. upsertTweet handles duplicates gracefully.
+  const startDate = new Date(Date.now() - 45 * 60 * 1000);
 
   const filter = {
     minLikes:    config.minLikes,
