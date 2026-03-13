@@ -292,8 +292,8 @@ async function getTweets(filters = {}) {
     params.push(media);
   }
 
-  // Always exclude blacklisted handles
-  conditions.push(`author_handle NOT IN (SELECT handle FROM blacklist)`);
+  // Always exclude blacklisted handles (blacklist stored lowercase, compare with LOWER)
+  conditions.push(`LOWER(author_handle) NOT IN (SELECT handle FROM blacklist)`);
 
   if (filters.min_likes) {
     conditions.push(`likes >= $${idx++}`);
