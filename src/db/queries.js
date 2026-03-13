@@ -1,13 +1,47 @@
 const db = require('./index');
 
 // ─── Virality Score ───────────────────────────────────────────────────────────
-// Acceleration is the most valuable signal — weight it heavily.
+//
+// Formula: Velocity × Spread × Momentum
+//
+//   velocity  = effective likes/hr (real lph if known, else likes ÷ age)
+//   spread    = RT ratio amplifier — content being shared > liked means it's
+//               escaping the author's follower base (strong viral signal)
+//   momentum  = acceleration bonus — still climbing vs peaked
+//   quality   = engagement rate (likes ÷ views) — sticky content
+//
+// Result is intentionally un-capped so parabolic tweets score orders of
+// magnitude above normal ones, making ranking meaningful.
 
-function calcViralityScore({ likes = 0, retweets = 0, replies = 0, views = 0, acceleration = 0, engagement_rate = 0 }) {
-  const base = (likes * 1) + (retweets * 2) + (replies * 1.5) + (views / 1000);
-  const accelBonus = Math.max(0, acceleration) * 8;      // reward accelerating tweets
-  const engBonus   = (engagement_rate || 0) * 40;        // reward high engagement rate
-  return Math.round(base + accelBonus + engBonus);
+function calcViralityScore({
+  likes = 0, retweets = 0, views = 0,
+  likes_per_hour = 0, acceleration = 0,
+  engagement_rate = 0, rt_ratio = 0,
+  posted_at = null,
+}) {
+  // Use real-time lph if available; otherwise estimate from tweet age
+  const ageHours = posted_at
+    ? Math.max(0.5, (Date.now() - new Date(posted_at)) / 3_600_000)
+    : 24;
+  const effectiveLph = likes_per_hour > 0 ? likes_per_hour : Math.round(likes / ageHours);
+
+  // 1. Velocity — how fast is it gaining likes RIGHT NOW?
+  const velocityScore = effectiveLph * 4;
+
+  // 2. Spread — RT/like ratio: content being shared beats content being liked
+  //    rt_ratio is stored as (retweets/likes)*100, so 50 = 50%
+  const spreadScore = (rt_ratio || 0) * 20;
+
+  // 3. Momentum — still accelerating? big bonus
+  const momentumScore = Math.max(0, acceleration) * 3;
+
+  // 4. Engagement quality — likes/views ratio rewards content people act on
+  const engagementScore = (engagement_rate || 0) * 30;
+
+  // 5. Base gravity — log scale so raw size matters but doesn't dominate
+  const baseScore = Math.log10(Math.max(10, likes)) * 60;
+
+  return Math.round(velocityScore + spreadScore + momentumScore + engagementScore + baseScore);
 }
 
 // ─── Upsert tweet (create or update metrics) ─────────────────────────────────
@@ -20,7 +54,7 @@ async function upsertTweet(data) {
     ? Math.min(100, (data.retweets / data.likes) * 100)
     : 0;
 
-  const score = calcViralityScore({ ...data, engagement_rate });
+  const score = calcViralityScore({ ...data, engagement_rate, rt_ratio });
 
   await db.query(
     `INSERT INTO tweets (
@@ -141,6 +175,7 @@ async function recalculateGrowth() {
     )
     SELECT
       l.tweet_id,
+      t.likes, t.retweets, t.views, t.engagement_rate, t.rt_ratio, t.posted_at,
 
       -- recent velocity (latest → mid)
       CASE WHEN m.tweet_id IS NOT NULL AND l.recorded_at > m.recorded_at THEN
@@ -164,6 +199,7 @@ async function recalculateGrowth() {
     FROM latest l
     LEFT JOIN mid      m ON l.tweet_id = m.tweet_id
     LEFT JOIN baseline b ON l.tweet_id = b.tweet_id
+    JOIN tweets t ON l.tweet_id = t.tweet_id
   `);
 
   for (const row of rows) {
@@ -185,19 +221,32 @@ async function recalculateGrowth() {
       status = 'fading';                        // peaked, velocity collapsing
     }
 
+    const viralityScore = calcViralityScore({
+      likes:          row.likes,
+      retweets:       row.retweets,
+      views:          row.views,
+      likes_per_hour: Math.round(lph),
+      acceleration:   accel !== null ? Math.round(accel) : 0,
+      engagement_rate: parseFloat(row.engagement_rate) || 0,
+      rt_ratio:       parseFloat(row.rt_ratio) || 0,
+      posted_at:      row.posted_at,
+    });
+
     await db.query(
       `UPDATE tweets
        SET likes_per_hour = $1,
            views_per_hour = $2,
            acceleration   = $3,
            status         = $4,
+           virality_score = $5,
            last_updated   = NOW()
-       WHERE tweet_id = $5`,
+       WHERE tweet_id = $6`,
       [
         Math.round(lph),
         Math.round(vph),
         accel !== null ? Math.round(accel) : 0,
         status,
+        viralityScore,
         row.tweet_id,
       ]
     );

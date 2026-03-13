@@ -8,165 +8,157 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg:          #080b10;
-      --surface:     #0f1318;
-      --surface2:    #161c24;
-      --border:      #1e2733;
-      --border2:     #2a3545;
-      --text:        #e2e8f0;
-      --muted:       #64748b;
-      --muted2:      #94a3b8;
-      --accent:      #3b82f6;
-      --green:       #22c55e;
-      --orange:      #f97316;
-      --red:         #ef4444;
-      --purple:      #a855f7;
-      --yellow:      #eab308;
-      --gray:        #475569;
+      --bg:       #080b10;
+      --surface:  #0f1318;
+      --surface2: #161c24;
+      --border:   #1e2733;
+      --border2:  #2a3545;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --muted2:   #94a3b8;
+      --accent:   #3b82f6;
+      --green:    #22c55e;
+      --orange:   #f97316;
+      --red:      #ef4444;
+      --purple:   #a855f7;
+      --yellow:   #eab308;
+      --gray:     #475569;
     }
-    html { scroll-behavior: smooth; }
     body {
-      background: var(--bg);
-      color: var(--text);
+      background: var(--bg); color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 14px;
-      min-height: 100vh;
+      font-size: 13px; min-height: 100vh;
     }
 
-    /* ── Hero ─────────────────────────────────────────────── */
-    .hero {
-      background: linear-gradient(180deg, #0a0f1a 0%, var(--bg) 100%);
-      border-bottom: 1px solid var(--border);
-      padding: 48px 24px 36px;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
+    /* ── Header ── */
+    .header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 14px 20px; display: flex; align-items: center; gap: 16px;
     }
-    .hero::before {
-      content: '';
-      position: absolute; top: -120px; left: 50%;
-      transform: translateX(-50%);
-      width: 600px; height: 300px;
-      background: radial-gradient(ellipse, rgba(59,130,246,.12) 0%, transparent 70%);
-      pointer-events: none;
-    }
-    .hero-eyebrow {
-      display: inline-flex; align-items: center; gap: 6px;
-      font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;
-      color: var(--accent);
-      background: rgba(59,130,246,.08);
-      border: 1px solid rgba(59,130,246,.2);
-      padding: 5px 12px; border-radius: 20px; margin-bottom: 18px;
-    }
-    .pulse {
-      width: 7px; height: 7px; background: var(--green); border-radius: 50%;
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,.4); }
-      50%       { opacity: .7; box-shadow: 0 0 0 6px rgba(34,197,94,0); }
-    }
-    .hero-title {
-      font-size: clamp(32px, 5vw, 52px); font-weight: 800;
-      letter-spacing: -1.5px; line-height: 1.1; margin-bottom: 14px;
-    }
-    .hero-title .hi { color: var(--accent); }
-    .hero-sub { font-size: 16px; color: var(--muted2); max-width: 500px; margin: 0 auto 32px; line-height: 1.6; }
-    .hero-stats { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
-    .hero-stat {
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 12px; padding: 14px 22px; min-width: 130px; text-align: center;
-      transition: border-color .2s, transform .2s;
-    }
-    .hero-stat:hover { border-color: var(--border2); transform: translateY(-2px); }
-    .hero-stat-value { font-size: 28px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
-    .hero-stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-top: 5px; }
-    .hero-stat.parabolic .hero-stat-value { color: var(--red); }
-    .hero-stat.fast      .hero-stat-value { color: var(--orange); }
-    .hero-stat.good      .hero-stat-value { color: var(--green); }
+    .header-title { font-size: 17px; font-weight: 800; letter-spacing: -0.5px; }
+    .header-title span { color: var(--accent); }
+    .header-stats { display: flex; gap: 10px; margin-left: auto; flex-wrap: wrap; align-items: center; }
+    .hstat { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 5px 12px; text-align: center; }
+    .hstat-val { font-size: 15px; font-weight: 700; line-height: 1; }
+    .hstat-lbl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; margin-top: 2px; }
+    .hstat.p .hstat-val { color: var(--red); }
+    .hstat.f .hstat-val { color: var(--orange); }
+    .hstat.w .hstat-val { color: var(--yellow); }
+    .hstat.g .hstat-val { color: var(--green); }
 
-    /* ── Toolbar ──────────────────────────────────────────── */
+    /* ── Toolbar ── */
     .toolbar {
-      display: flex; gap: 8px; padding: 12px 24px;
+      display: flex; gap: 8px; padding: 10px 20px;
       border-bottom: 1px solid var(--border); background: var(--surface);
       flex-wrap: wrap; align-items: flex-end;
       position: sticky; top: 0; z-index: 50;
     }
-    .tg { display: flex; flex-direction: column; gap: 4px; }
-    .tl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; font-weight: 600; }
+    .tg { display: flex; flex-direction: column; gap: 3px; }
+    .tl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; font-weight: 600; }
     select, input[type="text"], input[type="number"] {
       background: var(--surface2); border: 1px solid var(--border);
-      color: var(--text); border-radius: 7px; padding: 6px 10px;
-      font-size: 13px; outline: none; transition: border-color .15s; height: 34px;
+      color: var(--text); border-radius: 6px; padding: 5px 8px;
+      font-size: 12px; outline: none; transition: border-color .15s; height: 30px;
     }
     select:focus, input:focus { border-color: var(--accent); }
     .btn {
-      display: inline-flex; align-items: center; gap: 5px;
-      height: 34px; padding: 0 14px; border-radius: 7px; border: none;
-      cursor: pointer; font-size: 13px; font-weight: 600;
-      transition: opacity .15s, transform .1s; white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 4px;
+      height: 30px; padding: 0 12px; border-radius: 6px; border: none;
+      cursor: pointer; font-size: 12px; font-weight: 600;
+      transition: opacity .15s; white-space: nowrap;
     }
     .btn:hover { opacity: .85; }
-    .btn:active { transform: scale(.97); }
     .btn-primary { background: var(--accent); color: #fff; }
     .btn-ghost   { background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
     .ms-auto     { margin-left: auto; }
 
-    /* ── Status tabs ──────────────────────────────────────── */
+    /* ── Tabs ── */
     .tabs {
-      display: flex; gap: 4px; padding: 10px 24px;
+      display: flex; gap: 2px; padding: 8px 20px;
       border-bottom: 1px solid var(--border); background: var(--surface);
     }
     .tab {
-      padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 600;
+      padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 600;
       cursor: pointer; border: 1px solid transparent; color: var(--muted2);
-      transition: all .15s; display: flex; align-items: center; gap: 6px;
+      transition: all .15s; display: flex; align-items: center; gap: 5px;
     }
     .tab:hover { color: var(--text); background: var(--surface2); }
     .tab.active { border-color: var(--border2); background: var(--surface2); color: var(--text); }
-    .tc { font-size: 10px; background: var(--border); border-radius: 10px; padding: 1px 6px; }
-    .tab.tp.active .tc { background: rgba(239,68,68,.25);   color: var(--red);    }
-    .tab.tf.active .tc { background: rgba(249,115,22,.2);   color: var(--orange); }
-    .tab.tw.active .tc { background: rgba(234,179,8,.2);    color: var(--yellow); }
-    .tab.td.active .tc { background: rgba(71,85,105,.2);    color: var(--gray);   }
+    .tc { font-size: 9px; background: var(--border); border-radius: 8px; padding: 1px 5px; }
 
-    /* ── Card grid ────────────────────────────────────────── */
-    .feed {
-      padding: 20px 24px 80px;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-      gap: 14px;
+    /* ── Table ── */
+    .table-wrap {
+      overflow-x: auto;
+      padding: 0 0 80px;
     }
-
-    /* ── Tweet card ───────────────────────────────────────── */
-    .card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 14px; padding: 18px;
-      display: flex; flex-direction: column; gap: 12px;
-      transition: border-color .2s, transform .2s, box-shadow .2s;
+    table.tweets {
+      width: 100%; border-collapse: collapse; min-width: 900px;
     }
-    .card:hover { border-color: var(--border2); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
-    .card.parabolic { border-left: 3px solid var(--red);    }
-    .card.fast      { border-left: 3px solid var(--orange); }
-    .card.warming   { border-left: 3px solid var(--yellow); }
-    .card.fading    { border-left: 3px solid var(--gray); opacity: .75; }
+    table.tweets thead th {
+      background: var(--surface); border-bottom: 2px solid var(--border2);
+      padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .7px; color: var(--muted);
+      position: sticky; top: 0; white-space: nowrap; user-select: none;
+    }
+    table.tweets thead th.sortable {
+      cursor: pointer;
+    }
+    table.tweets thead th.sortable:hover { color: var(--text); }
+    table.tweets thead th.sort-active { color: var(--accent); }
+    table.tweets thead th.num { text-align: right; }
+    table.tweets tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .1s;
+    }
+    table.tweets tbody tr:hover { background: var(--surface); }
+    table.tweets td { padding: 10px 12px; vertical-align: middle; }
+    table.tweets td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
-    .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-    .card-author { display: flex; align-items: center; gap: 10px; }
+    .rank { color: var(--muted); font-size: 11px; font-weight: 700; min-width: 28px; }
+
+    .author-cell { white-space: nowrap; }
+    .author-inner { display: flex; align-items: center; gap: 7px; }
     .avatar {
-      width: 38px; height: 38px; border-radius: 50%;
+      width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
       background: var(--surface2); border: 1px solid var(--border);
       display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 15px; color: var(--accent);
-      flex-shrink: 0; text-transform: uppercase;
+      font-weight: 700; font-size: 12px; color: var(--accent); text-transform: uppercase;
     }
-    .author-name   { font-weight: 600; font-size: 14px; line-height: 1.2; }
-    .author-handle { font-size: 12px; color: var(--muted); }
+    .author-name  { font-weight: 600; font-size: 12px; line-height: 1.2; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .author-handle{ font-size: 10px; color: var(--muted); }
 
+    .text-cell { max-width: 320px; }
+    .tweet-text {
+      font-size: 12px; line-height: 1.45; color: var(--text);
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .media-tag {
+      display: inline-block; font-size: 9px;
+      background: rgba(99,102,241,.15); color: #a5b4fc;
+      border: 1px solid rgba(99,102,241,.2); border-radius: 4px;
+      padding: 1px 5px; margin-right: 5px;
+      text-transform: uppercase; font-weight: 600;
+    }
+
+    .num-big   { font-size: 13px; font-weight: 700; }
+    .num-muted { font-size: 11px; color: var(--muted2); }
+    .lph-val   { color: var(--green); font-weight: 700; font-size: 12px; }
+    .lph-zero  { color: var(--muted); }
+    .accel-up  { color: var(--green);  font-weight: 700; }
+    .accel-dn  { color: var(--gray);   }
+    .accel-zero{ color: var(--muted);  }
+
+    /* V-Score bar */
+    .vscore-cell { min-width: 90px; }
+    .vscore-num  { font-size: 12px; font-weight: 700; color: var(--accent); }
+    .vscore-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-top: 3px; }
+    .vscore-bar  { height: 3px; border-radius: 2px; background: var(--accent); }
+
+    /* Badges */
     .badge {
-      display: inline-flex; align-items: center; gap: 4px;
-      font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
-      white-space: nowrap; letter-spacing: .4px; text-transform: uppercase; flex-shrink: 0;
+      display: inline-flex; align-items: center;
+      font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 10px;
+      white-space: nowrap; letter-spacing: .3px; text-transform: uppercase;
     }
     .b-p { background: rgba(239,68,68,.15);  color: var(--red);    border: 1px solid rgba(239,68,68,.3); }
     .b-f { background: rgba(249,115,22,.15); color: var(--orange); border: 1px solid rgba(249,115,22,.3); }
@@ -174,62 +166,28 @@
     .b-d { background: rgba(71,85,105,.15);  color: var(--gray);   border: 1px solid rgba(71,85,105,.3); }
     .b-n { background: rgba(34,197,94,.08);  color: var(--green);  border: 1px solid rgba(34,197,94,.2); }
 
-    .card-text {
-      font-size: 14px; line-height: 1.55; color: var(--text);
-      display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
-    }
-    .media-tag {
-      display: inline-block; font-size: 10px;
-      background: rgba(99,102,241,.15); color: #a5b4fc;
-      border: 1px solid rgba(99,102,241,.2); border-radius: 5px;
-      padding: 2px 7px; margin-bottom: 4px;
-      text-transform: uppercase; font-weight: 600; letter-spacing: .4px;
-    }
+    .age-cell { color: var(--muted2); font-size: 11px; white-space: nowrap; }
 
-    .metrics {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
-    }
-    .m {
-      background: var(--surface2); border-radius: 8px; padding: 8px; text-align: center;
-    }
-    .mv { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
-    .ml { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-top: 3px; }
-    .m.hi .mv { color: var(--accent); }
-
-    .growth-row {
-      display: flex; align-items: center; justify-content: space-between;
-      font-size: 12px; color: var(--muted);
-    }
-    .growth-chips { display: flex; gap: 10px; }
-    .gc { display: flex; align-items: center; gap: 3px; color: var(--green); font-weight: 600; font-size: 12px; }
-    .gc.v { color: var(--purple); }
-
-    .card-foot {
-      display: flex; align-items: center; justify-content: space-between;
-      padding-top: 10px; border-top: 1px solid var(--border);
-    }
-    .vscore { font-size: 11px; color: var(--muted); }
-    .vscore span { color: var(--muted2); font-weight: 600; }
-    .card-btns { display: flex; gap: 6px; }
+    .action-cell { white-space: nowrap; }
     .cbtn {
-      padding: 5px 10px; font-size: 11px; border-radius: 6px;
+      padding: 3px 8px; font-size: 10px; border-radius: 5px;
       border: 1px solid var(--border); background: none; color: var(--muted2);
-      cursor: pointer; font-weight: 600; transition: all .15s;
+      cursor: pointer; font-weight: 600; transition: all .15s; margin-left: 3px;
     }
     .cbtn:hover { border-color: var(--accent); color: var(--accent); }
     .cbtn.open:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-    /* ── States ───────────────────────────────────────────── */
-    .state-box { grid-column: 1/-1; text-align: center; padding: 80px 0; color: var(--muted); }
+    /* ── State boxes ── */
+    .state-box { text-align: center; padding: 60px 0; color: var(--muted); }
     .spinner {
-      width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent);
-      border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 16px;
+      width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 14px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .state-box p { font-size: 15px; }
-    .state-box small { font-size: 12px; color: var(--muted); display: block; margin-top: 6px; }
+    .state-box p { font-size: 15px; margin-bottom: 6px; }
+    .state-box small { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
 
-    /* ── Chart modal ──────────────────────────────────────── */
+    /* ── Chart modal ── */
     .modal-bd {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,.8); z-index: 200;
@@ -238,25 +196,24 @@
     .modal-bd.open { display: flex; }
     .modal {
       background: var(--surface); border: 1px solid var(--border2);
-      border-radius: 16px; padding: 24px;
-      width: min(700px, 95vw); max-height: 90vh; overflow-y: auto;
+      border-radius: 14px; padding: 22px;
+      width: min(680px, 95vw); max-height: 90vh; overflow-y: auto;
     }
-    .modal-hd { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
-    .modal-title { font-size: 16px; font-weight: 700; }
-    .modal-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .modal-hd { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+    .modal-title { font-size: 15px; font-weight: 700; }
+    .modal-sub   { font-size: 11px; color: var(--muted); margin-top: 3px; }
     .modal-x {
       background: var(--surface2); border: 1px solid var(--border); color: var(--muted2);
-      width: 28px; height: 28px; border-radius: 7px; font-size: 16px; cursor: pointer;
+      width: 26px; height: 26px; border-radius: 6px; font-size: 15px; cursor: pointer;
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
-    .modal-x:hover { border-color: var(--border2); color: var(--text); }
-    .chart-wrap { position: relative; height: 200px; margin-bottom: 16px; }
+    .chart-wrap { position: relative; height: 190px; margin-bottom: 14px; }
 
-    /* ── Toast ────────────────────────────────────────────── */
+    /* ── Toast ── */
     .toast {
       position: fixed; bottom: 24px; right: 24px;
       background: var(--surface2); border: 1px solid var(--border2);
-      border-radius: 10px; padding: 12px 18px; font-size: 13px;
+      border-radius: 9px; padding: 10px 16px; font-size: 12px;
       opacity: 0; transform: translateY(8px); transition: all .25s;
       z-index: 300; pointer-events: none; max-width: 320px;
     }
@@ -265,63 +222,46 @@
     .toast.err { border-left: 3px solid var(--red); }
     .toast.inf { border-left: 3px solid var(--accent); }
 
-    /* ── Status footer ────────────────────────────────────── */
+    /* ── Footer ── */
     .foot {
       position: fixed; bottom: 0; left: 0; right: 0;
       background: var(--surface); border-top: 1px solid var(--border);
-      padding: 8px 24px; font-size: 11px; color: var(--muted);
+      padding: 7px 20px; font-size: 11px; color: var(--muted);
       display: flex; align-items: center; gap: 16px; z-index: 40;
     }
     .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); display: inline-block; }
     .dot.busy { background: var(--orange); animation: pulse 1s infinite; }
-
-    @media (max-width: 640px) {
-      .hero { padding: 32px 16px 24px; }
-      .toolbar { padding: 10px 16px; }
-      .feed { padding: 14px 12px 80px; grid-template-columns: 1fr; }
+    @keyframes pulse {
+      0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(249,115,22,.4); }
+      50%      { opacity:.7; box-shadow: 0 0 0 5px rgba(249,115,22,0); }
     }
   </style>
 </head>
 <body>
 
-<div class="hero">
-  <div class="hero-eyebrow"><span class="pulse"></span> Live &mdash; refreshes every 30 min</div>
-  <h1 class="hero-title">Viral Tweet<br><span class="hi">Radar</span></h1>
-  <p class="hero-sub">Catches tweets at 800+ likes and tracks their acceleration — before they go parabolic.</p>
-  <div class="hero-stats">
-    <div class="hero-stat good">
-      <div class="hero-stat-value" id="statTotal">—</div>
-      <div class="hero-stat-label">Tracked</div>
-    </div>
-    <div class="hero-stat parabolic">
-      <div class="hero-stat-value" id="statParabolic">—</div>
-      <div class="hero-stat-label">🔥 Parabolic</div>
-    </div>
-    <div class="hero-stat fast">
-      <div class="hero-stat-value" id="statFast">—</div>
-      <div class="hero-stat-label">⚡ Fast</div>
-    </div>
-    <div class="hero-stat" style="--hi:var(--yellow)">
-      <div class="hero-stat-value" id="statWarming" style="color:var(--yellow)">—</div>
-      <div class="hero-stat-label">🌡️ Warming</div>
-    </div>
-    <div class="hero-stat">
-      <div class="hero-stat-value" id="statMaxAccel">—</div>
-      <div class="hero-stat-label">Peak Accel/hr</div>
-    </div>
+<!-- Header -->
+<div class="header">
+  <div class="header-title">TWITTER<span>ATI</span> <span style="font-size:11px;color:var(--muted);font-weight:400">Viral Radar</span></div>
+  <div class="header-stats">
+    <div class="hstat g"><div class="hstat-val" id="statTotal">—</div><div class="hstat-lbl">Tracked</div></div>
+    <div class="hstat p"><div class="hstat-val" id="statParabolic">—</div><div class="hstat-lbl">🔥 Parabolic</div></div>
+    <div class="hstat f"><div class="hstat-val" id="statFast">—</div><div class="hstat-lbl">⚡ Fast</div></div>
+    <div class="hstat w"><div class="hstat-val" id="statWarming">—</div><div class="hstat-lbl">🌡 Warming</div></div>
+    <div class="hstat"  ><div class="hstat-val" id="statMaxAccel">—</div><div class="hstat-lbl">Peak Accel/hr</div></div>
   </div>
 </div>
 
+<!-- Toolbar -->
 <div class="toolbar">
   <div class="tg"><span class="tl">Sort</span>
-    <select id="filterSort">
-      <option value="acceleration">Acceleration ↑ (default)</option>
-      <option value="growth">Velocity (likes/hr)</option>
+    <select id="filterSort" onchange="App.load()">
+      <option value="virality">V-Score ↓</option>
+      <option value="acceleration">Acceleration ↓</option>
+      <option value="growth">Likes/hr ↓</option>
       <option value="likes">Most Likes</option>
       <option value="views">Most Views</option>
-      <option value="engagement">Engagement Rate</option>
-      <option value="virality">Virality Score</option>
-      <option value="newest">Newest First</option>
+      <option value="newest">Newest</option>
+      <option value="engagement">Engagement %</option>
     </select>
   </div>
   <div class="tg"><span class="tl">Media</span>
@@ -331,39 +271,64 @@
       <option value="false">Text Only</option>
     </select>
   </div>
-  <div class="tg"><span class="tl">Min Likes (filter)</span>
-    <input type="number" id="filterMinLikes" value="3000" min="0" style="width:110px" />
+  <div class="tg"><span class="tl">Min Likes</span>
+    <input type="number" id="filterMinLikes" value="10000" min="0" style="width:90px" />
   </div>
   <div class="tg"><span class="tl">Author</span>
-    <input type="text" id="filterAuthor" placeholder="@handle" style="width:130px" />
+    <input type="text" id="filterAuthor" placeholder="@handle" style="width:110px" />
   </div>
   <button class="btn btn-primary" onclick="App.load()">Apply</button>
-  <div class="ms-auto" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+
+  <div class="ms-auto" style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap">
     <div class="tg">
       <span class="tl" style="color:var(--orange)">Search ⚡ min_faves</span>
-      <input type="number" id="searchMinLikes" min="100" step="1000" style="width:100px" placeholder="10000" />
+      <input type="number" id="searchMinLikes" min="100" step="1000" style="width:90px" placeholder="10000" />
     </div>
     <div class="tg">
       <span class="tl" style="color:var(--orange)">min_retweets</span>
-      <input type="number" id="searchMinRetweets" min="0" step="100" style="width:90px" placeholder="0" />
+      <input type="number" id="searchMinRetweets" min="0" step="100" style="width:80px" placeholder="0" />
     </div>
     <button class="btn btn-ghost" onclick="App.applySearchThreshold()" style="align-self:flex-end">Set &amp; Fetch</button>
-    <button class="btn btn-ghost" onclick="App.triggerRefresh('refresh')">Refresh Metrics</button>
-    <button class="btn btn-primary" onclick="App.triggerRefresh('fetch')">Fetch New</button>
+    <button class="btn btn-ghost" onclick="App.triggerRefresh('refresh')" style="align-self:flex-end">Refresh Metrics</button>
+    <button class="btn btn-primary" onclick="App.triggerRefresh('fetch')" style="align-self:flex-end">Fetch New</button>
   </div>
 </div>
 
+<!-- Tabs -->
 <div class="tabs">
   <div class="tab active" onclick="App.setTab(this,'all')">All <span class="tc" id="tcAll">0</span></div>
-  <div class="tab tp"     onclick="App.setTab(this,'parabolic')">🔥 Parabolic <span class="tc" id="tcParabolic">0</span></div>
-  <div class="tab tf"     onclick="App.setTab(this,'fast')">⚡ Fast <span class="tc" id="tcFast">0</span></div>
-  <div class="tab tw"     onclick="App.setTab(this,'warming')">🌡️ Warming <span class="tc" id="tcWarming">0</span></div>
-  <div class="tab"        onclick="App.setTab(this,'normal')">✓ Normal <span class="tc" id="tcNormal">0</span></div>
-  <div class="tab td"     onclick="App.setTab(this,'fading')">💀 Fading <span class="tc" id="tcFading">0</span></div>
+  <div class="tab" onclick="App.setTab(this,'parabolic')">🔥 Parabolic <span class="tc" id="tcParabolic">0</span></div>
+  <div class="tab" onclick="App.setTab(this,'fast')">⚡ Fast <span class="tc" id="tcFast">0</span></div>
+  <div class="tab" onclick="App.setTab(this,'warming')">🌡 Warming <span class="tc" id="tcWarming">0</span></div>
+  <div class="tab" onclick="App.setTab(this,'normal')">✓ Normal <span class="tc" id="tcNormal">0</span></div>
+  <div class="tab" onclick="App.setTab(this,'fading')">💀 Fading <span class="tc" id="tcFading">0</span></div>
 </div>
 
-<div class="feed" id="feed">
-  <div class="state-box"><div class="spinner"></div><p>Loading viral tweets…</p></div>
+<!-- Table -->
+<div class="table-wrap">
+  <table class="tweets">
+    <thead>
+      <tr>
+        <th style="width:36px">#</th>
+        <th style="width:150px">Author</th>
+        <th>Tweet</th>
+        <th class="num sortable" onclick="App.setSortAndLoad('likes')"    id="th-likes">Likes</th>
+        <th class="num sortable" onclick="App.setSortAndLoad('views')"    id="th-views">Views</th>
+        <th class="num" style="width:56px">RTs</th>
+        <th class="num" style="width:48px">Replies</th>
+        <th class="num sortable" onclick="App.setSortAndLoad('growth')"   id="th-growth">LPH ↕</th>
+        <th class="num sortable" onclick="App.setSortAndLoad('acceleration')" id="th-accel">Accel ↕</th>
+        <th class="num sortable" onclick="App.setSortAndLoad('engagement')" id="th-eng">Eng%</th>
+        <th class="num sortable" onclick="App.setSortAndLoad('virality')" id="th-vscore">V-Score ↕</th>
+        <th>Status</th>
+        <th>Age</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="feed">
+      <tr><td colspan="14"><div class="state-box"><div class="spinner"></div><p>Loading…</p></div></td></tr>
+    </tbody>
+  </table>
 </div>
 
 <!-- Chart modal -->

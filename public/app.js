@@ -1,13 +1,15 @@
 /* global Chart */
 
 const App = (() => {
-  let activeTab    = 'all';
-  let autoTimer    = null;
-  let likesChart   = null;
-  let viewsChart   = null;
-  let allTweets    = [];   // cache for tab counts
+  let activeTab  = 'all';
+  let activeSort = 'virality';
+  let autoTimer  = null;
+  let likesChart = null;
+  let viewsChart = null;
+  let allTweets  = [];
+  let maxVScore  = 1;   // for the V-score bar scaling
 
-  // ─── Formatters ────────────────────────────────────────────────────────────
+  // ─── Formatters ──────────────────────────────────────────────────────────────
 
   function fmt(n) {
     if (n === null || n === undefined || n === '') return '—';
@@ -33,79 +35,88 @@ const App = (() => {
   }
 
   function avatarLetter(handle) {
-    return (handle || '?').replace('@', '')[0] || '?';
+    return (handle || '?').replace('@', '')[0]?.toUpperCase() || '?';
   }
 
-  // ─── Badge helpers ──────────────────────────────────────────────────────────
+  // ─── Badge ───────────────────────────────────────────────────────────────────
 
-  function badgeClass(status) {
-    return { parabolic: 'b-p', fast: 'b-f', warming: 'b-w', fading: 'b-d', normal: 'b-n' }[status] || 'b-n';
+  function badge(status) {
+    const map = {
+      parabolic: ['b-p', '🔥 Parabolic'],
+      fast:      ['b-f', '⚡ Fast'],
+      warming:   ['b-w', '🌡 Warming'],
+      fading:    ['b-d', '💀 Fading'],
+      normal:    ['b-n', '✓ Normal'],
+    };
+    const [cls, label] = map[status] || ['b-n', status];
+    return `<span class="badge ${cls}">${label}</span>`;
   }
-  function badgeLabel(status) {
-    return { parabolic: '🔥 Parabolic', fast: '⚡ Fast', warming: '🌡️ Warming', fading: '💀 Fading', normal: '✓ Normal' }[status] || status;
-  }
 
-  // ─── Card renderer ──────────────────────────────────────────────────────────
+  // ─── Table row renderer ───────────────────────────────────────────────────────
 
-  function renderCard(t, i) {
-    const handle  = t.author_handle ? `@${t.author_handle}` : '—';
-    const name    = t.author_name   || handle;
-    const url     = t.tweet_url     || '#';
-    const lph     = t.likes_per_hour > 0 ? `+${fmt(t.likes_per_hour)}/hr` : null;
-    const vph     = t.views_per_hour > 0 ? `+${fmt(t.views_per_hour)}/hr` : null;
-    const accel   = t.acceleration;
-    const accelStr = accel > 0 ? `▲ +${fmt(accel)}/hr²` : accel < 0 ? `▼ ${fmt(accel)}/hr²` : null;
-    const accelColor = accel > 0 ? 'color:var(--green)' : 'color:var(--gray)';
+  function renderRow(t, i) {
+    const handle = t.author_handle ? `@${t.author_handle}` : '—';
+    const name   = t.author_name   || handle;
+    const url    = t.tweet_url     || '#';
+
+    const lph   = t.likes_per_hour;
+    const accel = t.acceleration;
+
+    const lphHtml = lph > 0
+      ? `<span class="lph-val">+${fmt(lph)}/hr</span>`
+      : `<span class="lph-zero">—</span>`;
+
+    let accelHtml;
+    if (accel > 0)       accelHtml = `<span class="accel-up">▲ +${fmt(accel)}</span>`;
+    else if (accel < 0)  accelHtml = `<span class="accel-dn">▼ ${fmt(accel)}</span>`;
+    else                 accelHtml = `<span class="accel-zero">—</span>`;
+
+    const score    = Math.round(t.virality_score || 0);
+    const barPct   = maxVScore > 0 ? Math.min(100, Math.round((score / maxVScore) * 100)) : 0;
+
+    const engPct = t.engagement_rate > 0
+      ? `${parseFloat(t.engagement_rate).toFixed(2)}%`
+      : '—';
 
     const mediaTag = t.has_media
-      ? `<span class="media-tag">${t.media_type || 'media'}</span><br>`
+      ? `<span class="media-tag">${t.media_type || 'media'}</span> `
       : '';
 
-    const growthChips = `
-      <div class="growth-chips">
-        ${lph ? `<span class="gc">▲ ${lph} likes</span>` : ''}
-        ${vph ? `<span class="gc v">▲ ${vph} views</span>` : ''}
-        ${accelStr ? `<span class="gc" style="${accelColor};font-size:11px">${accelStr}</span>` : ''}
-      </div>`;
-
-    return `
-      <div class="card ${t.status}" data-id="${t.tweet_id}">
-        <div class="card-top">
-          <div class="card-author">
-            <div class="avatar">${avatarLetter(t.author_handle)}</div>
-            <div>
-              <div class="author-name">${esc(name)}</div>
-              <div class="author-handle">${esc(handle)}</div>
-            </div>
-          </div>
-          <span class="badge ${badgeClass(t.status)}">${badgeLabel(t.status)}</span>
-        </div>
-
-        <div class="card-text">${mediaTag}${esc(t.tweet_text || '')}</div>
-
-        <div class="metrics">
-          <div class="m hi"><div class="mv">${fmt(t.likes)}</div><div class="ml">Likes</div></div>
-          <div class="m">   <div class="mv">${fmt(t.retweets)}</div><div class="ml">RTs</div></div>
-          <div class="m">   <div class="mv">${fmt(t.replies)}</div><div class="ml">Replies</div></div>
-          <div class="m">   <div class="mv">${fmt(t.views)}</div><div class="ml">Views</div></div>
-        </div>
-
-        <div class="growth-row">
-          ${growthChips}
-          <span>${timeAgo(t.posted_at)}</span>
-        </div>
-
-        <div class="card-foot">
-          <div class="vscore">Score: <span>${fmt(Math.round(t.virality_score || 0))}</span></div>
-          <div class="card-btns">
-            <button class="cbtn" onclick="App.openChart('${t.tweet_id}','${esc(handle)}','${esc(url)}')">Chart</button>
-            <a class="cbtn open" href="${esc(url)}" target="_blank" rel="noreferrer">Open ↗</a>
+    return `<tr>
+      <td class="rank">${i + 1}</td>
+      <td class="author-cell">
+        <div class="author-inner">
+          <div class="avatar">${avatarLetter(t.author_handle)}</div>
+          <div>
+            <div class="author-name" title="${esc(name)}">${esc(name)}</div>
+            <div class="author-handle">${esc(handle)}</div>
           </div>
         </div>
-      </div>`;
+      </td>
+      <td class="text-cell">
+        <div class="tweet-text">${mediaTag}${esc(t.tweet_text || '')}</div>
+      </td>
+      <td class="num"><span class="num-big" style="color:var(--accent)">${fmt(t.likes)}</span></td>
+      <td class="num"><span class="num-muted">${fmt(t.views)}</span></td>
+      <td class="num"><span class="num-muted">${fmt(t.retweets)}</span></td>
+      <td class="num"><span class="num-muted">${fmt(t.replies)}</span></td>
+      <td class="num">${lphHtml}</td>
+      <td class="num">${accelHtml}</td>
+      <td class="num"><span class="num-muted">${engPct}</span></td>
+      <td class="num vscore-cell">
+        <div class="vscore-num">${fmt(score)}</div>
+        <div class="vscore-bar-wrap"><div class="vscore-bar" style="width:${barPct}%"></div></div>
+      </td>
+      <td>${badge(t.status)}</td>
+      <td class="age-cell">${timeAgo(t.posted_at)}</td>
+      <td class="action-cell">
+        <button class="cbtn" onclick="App.openChart('${t.tweet_id}','${esc(handle)}','${esc(url)}')">Chart</button>
+        <a class="cbtn open" href="${esc(url)}" target="_blank" rel="noreferrer">↗</a>
+      </td>
+    </tr>`;
   }
 
-  // ─── Stats ──────────────────────────────────────────────────────────────────
+  // ─── Stats header ─────────────────────────────────────────────────────────────
 
   async function loadStats() {
     try {
@@ -131,64 +142,13 @@ const App = (() => {
 
       return stats;
     } catch (err) {
-      document.getElementById('footDot').className = 'dot err-dot';
+      document.getElementById('footDot').className = 'dot';
       document.getElementById('footStatus').textContent = `API error: ${err.message}`;
       return null;
     }
   }
 
-  // ─── Diagnostic panel (shown when feed is empty) ─────────────────────────────
-
-  function renderDiagnostic(stats) {
-    const s = stats?.scheduler || {};
-    const rows = [];
-
-    // Scheduler status
-    if (s.fetchRunning) {
-      rows.push(['Fetch status', '<span style="color:var(--orange)">⏳ Running now…</span>']);
-    } else if (s.lastFetch) {
-      rows.push(['Last fetch', `${timeAgo(s.lastFetch)} (${new Date(s.lastFetch).toLocaleTimeString()})`]);
-      rows.push(['Tweets fetched', s.lastFetchCount != null ? `${s.lastFetchCount} upserted` : 'unknown']);
-    } else {
-      rows.push(['Last fetch', '<span style="color:var(--red)">Never ran — still starting up or crashed</span>']);
-    }
-
-    if (s.lastFetchError) {
-      rows.push(['Fetch error', `<span style="color:var(--red)">${esc(s.lastFetchError)}</span>`]);
-    }
-
-    // DB counts
-    if (stats) {
-      const allTime = parseInt(stats.total_all_time, 10) || 0;
-      const window48 = parseInt(stats.total_tweets, 10) || 0;
-      if (allTime > 0 && window48 === 0) {
-        rows.push(['DB (all time)', `${allTime} tweets — but all older than 48 h (expand the time window?)`]);
-      } else {
-        rows.push(['DB (48 h window)', `${window48} tweets`]);
-        if (allTime > window48) rows.push(['DB (all time)', `${allTime} tweets`]);
-      }
-    }
-
-    const tableRows = rows.map(([k, v]) =>
-      `<tr><td style="color:var(--muted);padding:4px 12px 4px 0;white-space:nowrap">${k}</td><td>${v}</td></tr>`
-    ).join('');
-
-    return `
-      <div class="state-box">
-        <p>No tweets found</p>
-        <small style="margin-bottom:16px">Filters may be too narrow, or data hasn't been fetched yet.</small>
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;margin:12px auto 0;max-width:480px;text-align:left">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:600;margin-bottom:10px">Diagnostics</div>
-          <table style="font-size:12px;border-collapse:collapse;width:100%">${tableRows}</table>
-        </div>
-        <div style="margin-top:14px;display:flex;gap:8px;justify-content:center">
-          <button class="btn btn-primary" onclick="App.triggerRefresh('fetch')" style="font-size:12px;height:30px">Fetch New Tweets</button>
-          <button class="btn btn-ghost"   onclick="App.load()"                 style="font-size:12px;height:30px">Retry</button>
-        </div>
-      </div>`;
-  }
-
-  // ─── Tab counts ─────────────────────────────────────────────────────────────
+  // ─── Tab counts ──────────────────────────────────────────────────────────────
 
   function updateTabCounts(tweets) {
     const counts = { all: tweets.length, parabolic: 0, fast: 0, warming: 0, normal: 0, fading: 0 };
@@ -201,7 +161,68 @@ const App = (() => {
     document.getElementById('tcFading').textContent    = counts.fading;
   }
 
-  // ─── Main load ──────────────────────────────────────────────────────────────
+  // ─── Column sort highlight ────────────────────────────────────────────────────
+
+  const sortThMap = { likes: 'th-likes', views: 'th-views', growth: 'th-growth', acceleration: 'th-accel', virality: 'th-vscore', engagement: 'th-eng' };
+
+  function highlightSort(sort) {
+    Object.values(sortThMap).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('sort-active');
+    });
+    const active = sortThMap[sort];
+    if (active) {
+      const el = document.getElementById(active);
+      if (el) el.classList.add('sort-active');
+    }
+  }
+
+  // ─── Diagnostic panel ────────────────────────────────────────────────────────
+
+  function renderDiagnostic(stats) {
+    const s = stats?.scheduler || {};
+    const rows = [];
+
+    if (s.fetchRunning) {
+      rows.push(['Fetch status', '<span style="color:var(--orange)">⏳ Running now…</span>']);
+    } else if (s.lastFetch) {
+      rows.push(['Last fetch', `${timeAgo(s.lastFetch)} (${new Date(s.lastFetch).toLocaleTimeString()})`]);
+      rows.push(['Tweets fetched', s.lastFetchCount != null ? `${s.lastFetchCount} upserted` : 'unknown']);
+    } else {
+      rows.push(['Last fetch', '<span style="color:var(--red)">Never ran — still starting up or crashed</span>']);
+    }
+    if (s.lastFetchError) rows.push(['Fetch error', `<span style="color:var(--red)">${esc(s.lastFetchError)}</span>`]);
+
+    if (stats) {
+      const allTime  = parseInt(stats.total_all_time, 10) || 0;
+      const window48 = parseInt(stats.total_tweets,   10) || 0;
+      if (allTime > 0 && window48 === 0) {
+        rows.push(['DB (all time)', `${allTime} tweets — all older than 48 h`]);
+      } else {
+        rows.push(['DB (48 h)', `${window48} tweets`]);
+        if (allTime > window48) rows.push(['DB (all time)', `${allTime} tweets`]);
+      }
+    }
+
+    const tableRows = rows.map(([k, v]) =>
+      `<tr><td style="color:var(--muted);padding:4px 12px 4px 0;white-space:nowrap">${k}</td><td>${v}</td></tr>`
+    ).join('');
+
+    return `<tr><td colspan="14"><div class="state-box">
+      <p>No tweets found</p>
+      <small>Filters may be too narrow, or data hasn't been fetched yet.</small>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin:12px auto 0;max-width:460px;text-align:left">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:700;margin-bottom:8px">Diagnostics</div>
+        <table style="font-size:11px;border-collapse:collapse;width:100%">${tableRows}</table>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:center">
+        <button class="btn btn-primary" onclick="App.triggerRefresh('fetch')" style="font-size:11px;height:28px">Fetch New Tweets</button>
+        <button class="btn btn-ghost"   onclick="App.load()"                 style="font-size:11px;height:28px">Retry</button>
+      </div>
+    </div></td></tr>`;
+  }
+
+  // ─── API helpers ─────────────────────────────────────────────────────────────
 
   async function apiFetch(url) {
     const res = await fetch(url);
@@ -225,42 +246,50 @@ const App = (() => {
     return p.toString();
   }
 
-  async function load() {
-    const feed = document.getElementById('feed');
-    feed.innerHTML = '<div class="state-box"><div class="spinner"></div><p>Loading…</p></div>';
+  // ─── Main load ───────────────────────────────────────────────────────────────
 
-    let stats = null;
+  async function load() {
+    const sort = document.getElementById('filterSort').value;
+    activeSort = sort;
+    highlightSort(sort);
+
+    const tbody = document.getElementById('feed');
+    tbody.innerHTML = `<tr><td colspan="14"><div class="state-box"><div class="spinner"></div><p>Loading…</p></div></td></tr>`;
+
     try {
-      const [tweetsRes] = await Promise.all([
-        apiFetch(`/api/tweets?${buildQuery()}`),
-      ]);
-      const { tweets, count } = tweetsRes;
+      const { tweets, count } = await apiFetch(`/api/tweets?${buildQuery()}`);
       allTweets = tweets;
       updateTabCounts(tweets);
       document.getElementById('footCount').textContent = `${count} tweets shown`;
 
       if (!tweets.length) {
-        // Load stats to populate the diagnostic panel before rendering empty state
-        stats = await loadStats();
-        feed.innerHTML = renderDiagnostic(stats);
+        const stats = await loadStats();
+        tbody.innerHTML = renderDiagnostic(stats);
         return;
       }
 
-      feed.innerHTML = tweets.map(renderCard).join('');
+      maxVScore = Math.max(1, ...tweets.map(t => t.virality_score || 0));
+      tbody.innerHTML = tweets.map(renderRow).join('');
     } catch (err) {
-      stats = await loadStats();
-      feed.innerHTML = `<div class="state-box">
+      const stats = await loadStats();
+      tbody.innerHTML = `<tr><td colspan="14"><div class="state-box">
         <p style="color:var(--red)">⚠ Failed to load tweets</p>
         <small style="color:var(--red)">${esc(err.message)}</small>
-        ${stats ? renderDiagnostic(stats).replace('<div class="state-box">', '<div>').replace('</div>', '</div>') : ''}
-      </div>`;
+      </div></td></tr>`;
       return;
     }
 
     loadStats();
   }
 
-  // ─── Tab switching ──────────────────────────────────────────────────────────
+  // ─── Sort via column headers ──────────────────────────────────────────────────
+
+  function setSortAndLoad(sort) {
+    document.getElementById('filterSort').value = sort;
+    load();
+  }
+
+  // ─── Tab switching ────────────────────────────────────────────────────────────
 
   function setTab(el, status) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -269,13 +298,15 @@ const App = (() => {
     load();
   }
 
-  // ─── Search threshold ────────────────────────────────────────────────────────
+  // ─── Search threshold ─────────────────────────────────────────────────────────
 
   async function loadConfig() {
     try {
       const { config } = await apiFetch('/api/config');
-      if (config.minLikes)    document.getElementById('searchMinLikes').value    = config.minLikes;
+      if (config.minLikes)              document.getElementById('searchMinLikes').value    = config.minLikes;
       if (config.minRetweets !== undefined) document.getElementById('searchMinRetweets').value = config.minRetweets;
+      // Also sync display filter
+      document.getElementById('filterMinLikes').value = config.minLikes || 10000;
     } catch (_) {}
   }
 
@@ -300,7 +331,7 @@ const App = (() => {
     }
   }
 
-  // ─── Manual refresh ─────────────────────────────────────────────────────────
+  // ─── Manual refresh ───────────────────────────────────────────────────────────
 
   async function triggerRefresh(type) {
     try {
@@ -317,7 +348,7 @@ const App = (() => {
     }
   }
 
-  // ─── Growth chart modal ──────────────────────────────────────────────────────
+  // ─── Growth chart modal ───────────────────────────────────────────────────────
 
   async function openChart(tweetId, handle, url) {
     document.getElementById('modalTitle').textContent = `Growth — ${handle}`;
@@ -329,10 +360,7 @@ const App = (() => {
 
     try {
       const { history } = await apiFetch(`/api/tweets/${tweetId}/history`);
-
-      if (!history.length) {
-        return;
-      }
+      if (!history.length) return;
 
       const labels = history.map(h => {
         const d = new Date(h.recorded_at);
@@ -341,17 +369,11 @@ const App = (() => {
 
       const chartCfg = (label, data, color, bg) => ({
         type: 'line',
-        data: {
-          labels,
-          datasets: [{ label, data, borderColor: color, backgroundColor: bg,
-            tension: 0.4, pointRadius: 3, borderWidth: 2, fill: true }],
-        },
+        data: { labels, datasets: [{ label, data, borderColor: color, backgroundColor: bg,
+            tension: 0.4, pointRadius: 3, borderWidth: 2, fill: true }] },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            title: { display: true, text: label, color: '#64748b', font: { size: 12 } },
-          },
+          plugins: { legend: { display: false }, title: { display: true, text: label, color: '#64748b', font: { size: 11 } } },
           scales: {
             x: { ticks: { color: '#475569', maxTicksLimit: 6 }, grid: { color: '#1e2733' } },
             y: { ticks: { color: '#475569' }, grid: { color: '#1e2733' } },
@@ -359,14 +381,10 @@ const App = (() => {
         },
       });
 
-      likesChart = new Chart(
-        document.getElementById('likesChart'),
-        chartCfg('Likes over time', history.map(h => h.likes), '#3b82f6', 'rgba(59,130,246,.1)')
-      );
-      viewsChart = new Chart(
-        document.getElementById('viewsChart'),
-        chartCfg('Views over time', history.map(h => h.views), '#22c55e', 'rgba(34,197,94,.08)')
-      );
+      likesChart = new Chart(document.getElementById('likesChart'),
+        chartCfg('Likes over time', history.map(h => h.likes), '#3b82f6', 'rgba(59,130,246,.1)'));
+      viewsChart = new Chart(document.getElementById('viewsChart'),
+        chartCfg('Views over time', history.map(h => h.views), '#22c55e', 'rgba(34,197,94,.08)'));
     } catch (err) {
       console.error('Chart error', err);
     }
@@ -377,7 +395,7 @@ const App = (() => {
     document.getElementById('chartModal').classList.remove('open');
   }
 
-  // ─── Toast ──────────────────────────────────────────────────────────────────
+  // ─── Toast ────────────────────────────────────────────────────────────────────
 
   function showToast(msg, type = 'ok') {
     const el = document.getElementById('toast');
@@ -386,14 +404,13 @@ const App = (() => {
     setTimeout(() => { el.className = 'toast'; }, 3000);
   }
 
-  // ─── Init ────────────────────────────────────────────────────────────────────
+  // ─── Init ─────────────────────────────────────────────────────────────────────
 
   function init() {
     load();
     loadStats();
     loadConfig();
     autoTimer = setInterval(load, 90_000);
-
     ['filterAuthor', 'filterMinLikes'].forEach(id => {
       document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') load(); });
     });
@@ -401,5 +418,5 @@ const App = (() => {
 
   document.addEventListener('DOMContentLoaded', init);
 
-  return { load, setTab, triggerRefresh, openChart, closeModal, applySearchThreshold };
+  return { load, setTab, setSortAndLoad, triggerRefresh, openChart, closeModal, applySearchThreshold };
 })();
