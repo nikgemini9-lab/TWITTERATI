@@ -167,6 +167,7 @@
     .b-w { background: rgba(234,179,8,.15);  color: var(--yellow); border: 1px solid rgba(234,179,8,.3); }
     .b-d { background: rgba(71,85,105,.15);  color: var(--gray);   border: 1px solid rgba(71,85,105,.3); }
     .b-n { background: rgba(34,197,94,.08);  color: var(--green);  border: 1px solid rgba(34,197,94,.2); }
+    .b-m { background: rgba(168,85,247,.15); color: var(--purple); border: 1px solid rgba(168,85,247,.3); }
 
     .age-cell { color: var(--muted2); font-size: 11px; white-space: nowrap; }
 
@@ -274,7 +275,7 @@
     </select>
   </div>
   <div class="tg"><span class="tl">Min Likes</span>
-    <input type="number" id="filterMinLikes" value="10000" min="0" style="width:90px" />
+    <input type="number" id="filterMinLikes" value="2000" min="0" style="width:90px" />
   </div>
   <div class="tg"><span class="tl">Author</span>
     <input type="text" id="filterAuthor" placeholder="@handle" style="width:110px" />
@@ -318,7 +319,7 @@
         <th class="num sortable" onclick="App.setSortAndLoad('likes')"    id="th-likes">Likes</th>
         <th class="num sortable" onclick="App.setSortAndLoad('views')"    id="th-views">Views</th>
         <th class="num" style="width:56px">RTs</th>
-        <th class="num" style="width:48px">Replies</th>
+        <th class="num" style="width:64px">Replies / 💾BM</th>
         <th class="num sortable" onclick="App.setSortAndLoad('growth')"   id="th-growth">LPH ↕</th>
         <th class="num sortable" onclick="App.setSortAndLoad('acceleration')" id="th-accel">Accel ↕</th>
         <th class="num sortable" onclick="App.setSortAndLoad('engagement')" id="th-eng">Eng%</th>

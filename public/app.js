@@ -60,6 +60,24 @@ const App = (() => {
     else             btn.classList.remove('on');
   }
 
+  // ─── Meme candidate detection ─────────────────────────────────────────────────
+  //
+  // A tweet is a meme candidate when ALL of:
+  //   • has_media (it's an image/gif/video — memes aren't text threads)
+  //   • bookmark ratio > 3%  (people saving it = sourcing for token launches)
+  //   • RT:reply ratio > 10:1 (silent spreading, not debate)
+  //   • tweet text ≤ 60 chars (photo + caption format, e.g. "Albert Whiskars")
+  //
+  // "Albert Whiskars" (@trapbass_): bookmark ratio 7.7%, RT:reply 37:1, 12 chars → would flag
+
+  function isMemeCandidate(t) {
+    if (!t.has_media) return false;
+    const bookmarkRatio = t.likes > 0 ? t.bookmarks / t.likes : 0;
+    const rtToReply     = t.retweets / Math.max(1, t.replies);
+    const shortText     = !t.tweet_text || t.tweet_text.trim().length <= 60;
+    return bookmarkRatio > 0.03 && rtToReply > 10 && shortText;
+  }
+
   // ─── Badge ───────────────────────────────────────────────────────────────────
 
   function badge(status) {
@@ -121,7 +139,10 @@ const App = (() => {
       <td class="num"><span class="num-big" style="color:var(--accent)">${fmt(t.likes)}</span></td>
       <td class="num"><span class="num-muted">${fmt(t.views)}</span></td>
       <td class="num"><span class="num-muted">${fmt(t.retweets)}</span></td>
-      <td class="num"><span class="num-muted">${fmt(t.replies)}</span></td>
+      <td class="num">
+        <span class="num-muted">${fmt(t.replies)}</span>
+        ${t.bookmarks > 0 ? `<br><span style="color:var(--purple);font-size:10px">💾${fmt(t.bookmarks)}</span>` : ''}
+      </td>
       <td class="num">${lphHtml}</td>
       <td class="num">${accelHtml}</td>
       <td class="num"><span class="num-muted">${engPct}</span></td>
@@ -129,7 +150,7 @@ const App = (() => {
         <div class="vscore-num">${fmt(score)}</div>
         <div class="vscore-bar-wrap"><div class="vscore-bar" style="width:${barPct}%"></div></div>
       </td>
-      <td>${badge(t.status)}</td>
+      <td>${badge(t.status)}${isMemeCandidate(t) ? ' <span class="badge b-m">🎭 Meme</span>' : ''}</td>
       <td class="age-cell">${timeAgo(t.posted_at)}</td>
       <td class="action-cell">
         <button class="cbtn" onclick="App.openChart('${t.tweet_id}','${esc(handle)}','${esc(url)}')">Chart</button>

@@ -14,7 +14,7 @@ const db = require('./index');
 // magnitude above normal ones, making ranking meaningful.
 
 function calcViralityScore({
-  likes = 0, retweets = 0, views = 0,
+  likes = 0, retweets = 0, views = 0, bookmarks = 0, replies = 0,
   likes_per_hour = 0, acceleration = 0,
   engagement_rate = 0, rt_ratio = 0,
   posted_at = null,
@@ -41,7 +41,18 @@ function calcViralityScore({
   // 5. Base gravity — log scale so raw size matters but doesn't dominate
   const baseScore = Math.log10(Math.max(10, likes)) * 60;
 
-  return Math.round(velocityScore + spreadScore + momentumScore + engagementScore + baseScore);
+  // 6. Bookmark signal — people saving = strong intent (meme/token/reference material)
+  //    bookmark_ratio = bookmarks/likes * 100 (e.g. 7.7 for "Albert Whiskars" type memes)
+  //    Normal tweet: ~0.5  |  Viral meme: 3–10  → big bonus when high
+  const bookmarkRatio = likes > 0 ? (bookmarks / likes) * 100 : 0;
+  const bookmarkScore = bookmarkRatio * 40;
+
+  // 7. Meme fingerprint — high RT:reply ratio means silent spreading, not debate
+  //    Memes: 20–40:1  |  News/political: 3–5:1
+  const rtReplyRatio = retweets / Math.max(1, replies);
+  const memeSpreadBonus = rtReplyRatio > 10 ? Math.min(200, rtReplyRatio * 5) : 0;
+
+  return Math.round(velocityScore + spreadScore + momentumScore + engagementScore + baseScore + bookmarkScore + memeSpreadBonus);
 }
 
 // ─── Upsert tweet (create or update metrics) ─────────────────────────────────
@@ -54,7 +65,8 @@ async function upsertTweet(data) {
     ? Math.min(100, (data.retweets / data.likes) * 100)
     : 0;
 
-  const score = calcViralityScore({ ...data, engagement_rate, rt_ratio });
+  const score = calcViralityScore({ ...data, engagement_rate, rt_ratio,
+    bookmarks: data.bookmarks || 0, replies: data.replies || 0 });
 
   await db.query(
     `INSERT INTO tweets (
@@ -175,7 +187,7 @@ async function recalculateGrowth() {
     )
     SELECT
       l.tweet_id,
-      t.likes, t.retweets, t.views, t.engagement_rate, t.rt_ratio, t.posted_at,
+      t.likes, t.retweets, t.replies, t.views, t.bookmarks, t.engagement_rate, t.rt_ratio, t.posted_at,
 
       -- recent velocity (latest → mid)
       CASE WHEN m.tweet_id IS NOT NULL AND l.recorded_at > m.recorded_at THEN
@@ -224,7 +236,9 @@ async function recalculateGrowth() {
     const viralityScore = calcViralityScore({
       likes:          row.likes,
       retweets:       row.retweets,
+      replies:        row.replies,
       views:          row.views,
+      bookmarks:      row.bookmarks || 0,
       likes_per_hour: Math.round(lph),
       acceleration:   accel !== null ? Math.round(accel) : 0,
       engagement_rate: parseFloat(row.engagement_rate) || 0,
