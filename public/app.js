@@ -3,6 +3,7 @@
 const App = (() => {
   let activeTab    = 'all';
   let activeSort   = 'virality';
+  let sortDir      = 'desc';   // 'desc' | 'asc'
   let autoTimer    = null;
   let likesChart   = null;
   let viewsChart   = null;
@@ -206,17 +207,25 @@ const App = (() => {
 
   // ─── Column sort highlight ────────────────────────────────────────────────────
 
-  const sortThMap = { likes: 'th-likes', views: 'th-views', growth: 'th-growth', acceleration: 'th-accel', virality: 'th-vscore', engagement: 'th-eng' };
+  const sortThMap = { likes: 'th-likes', views: 'th-views', growth: 'th-growth', acceleration: 'th-accel', virality: 'th-vscore', engagement: 'th-eng', newest: 'th-time' };
 
-  function highlightSort(sort) {
-    Object.values(sortThMap).forEach(id => {
+  function highlightSort(sort, dir) {
+    Object.entries(sortThMap).forEach(([key, id]) => {
       const el = document.getElementById(id);
-      if (el) el.classList.remove('sort-active');
+      if (!el) return;
+      el.classList.remove('sort-active');
+      // reset arrow to neutral
+      el.dataset.arrow = '↕';
+      el.textContent = el.dataset.label + ' ↕';
     });
-    const active = sortThMap[sort];
-    if (active) {
-      const el = document.getElementById(active);
-      if (el) el.classList.add('sort-active');
+    const activeId = sortThMap[sort];
+    if (activeId) {
+      const el = document.getElementById(activeId);
+      if (el) {
+        el.classList.add('sort-active');
+        const arrow = dir === 'asc' ? '↑' : '↓';
+        el.textContent = el.dataset.label + ' ' + arrow;
+      }
     }
   }
 
@@ -281,7 +290,11 @@ const App = (() => {
     const author   = document.getElementById('filterAuthor').value.trim();
 
     if (activeTab !== 'all') p.set('status', activeTab);
-    if (sort)     p.set('sort',      sort);
+    if (sort) {
+      // column-header clicks use activeSort+sortDir; dropdown already encodes direction
+      const sortKey = sort.includes(':') ? sort : (sortDir === 'asc' ? `${sort}:asc` : sort);
+      p.set('sort', sortKey);
+    }
     if (media)    p.set('has_media', media);
     if (minLikes) p.set('min_likes', minLikes);
     if (author)   p.set('author',    author.replace(/^@/, ''));
@@ -293,8 +306,13 @@ const App = (() => {
 
   async function load() {
     const sort = document.getElementById('filterSort').value;
-    activeSort = sort;
-    highlightSort(sort);
+    activeSort = sort.includes(':') ? sort.split(':')[0] : sort;
+    if (!sort.includes(':')) {
+      // direction managed by sortDir state (set by column clicks)
+    } else {
+      sortDir = sort.includes(':asc') ? 'asc' : 'desc';
+    }
+    highlightSort(activeSort, sortDir);
 
     const tbody = document.getElementById('feed');
     tbody.innerHTML = `<tr><td colspan="14"><div class="state-box"><div class="spinner"></div><p>Loading…</p></div></td></tr>`;
@@ -329,7 +347,14 @@ const App = (() => {
   // ─── Sort via column headers ──────────────────────────────────────────────────
 
   function setSortAndLoad(sort) {
-    document.getElementById('filterSort').value = sort;
+    if (activeSort === sort) {
+      sortDir = sortDir === 'desc' ? 'asc' : 'desc';  // toggle direction
+    } else {
+      sortDir = 'desc';  // new column → default desc
+    }
+    activeSort = sort;
+    const dropdownVal = sortDir === 'asc' ? `${sort}:asc` : sort;
+    document.getElementById('filterSort').value = dropdownVal;
     load();
   }
 

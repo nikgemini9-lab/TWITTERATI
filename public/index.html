@@ -259,12 +259,19 @@
   <div class="tg"><span class="tl">Sort</span>
     <select id="filterSort" onchange="App.load()">
       <option value="virality">V-Score ↓</option>
+      <option value="virality:asc">V-Score ↑</option>
       <option value="acceleration">Acceleration ↓</option>
+      <option value="acceleration:asc">Acceleration ↑</option>
       <option value="growth">Likes/hr ↓</option>
-      <option value="likes">Most Likes</option>
-      <option value="views">Most Views</option>
-      <option value="newest">Newest</option>
-      <option value="engagement">Engagement %</option>
+      <option value="growth:asc">Likes/hr ↑</option>
+      <option value="likes">Likes ↓</option>
+      <option value="likes:asc">Likes ↑</option>
+      <option value="views">Views ↓</option>
+      <option value="views:asc">Views ↑</option>
+      <option value="engagement">Engagement ↓</option>
+      <option value="engagement:asc">Engagement ↑</option>
+      <option value="newest">Newest first</option>
+      <option value="newest:asc">Oldest first</option>
     </select>
   </div>
   <div class="tg"><span class="tl">Media</span>
@@ -316,16 +323,16 @@
         <th style="width:36px">#</th>
         <th style="width:150px">Author</th>
         <th>Tweet</th>
-        <th class="num sortable" onclick="App.setSortAndLoad('likes')"    id="th-likes">Likes</th>
-        <th class="num sortable" onclick="App.setSortAndLoad('views')"    id="th-views">Views</th>
+        <th class="num sortable" onclick="App.setSortAndLoad('likes')"        id="th-likes"  data-label="Likes">Likes ↕</th>
+        <th class="num sortable" onclick="App.setSortAndLoad('views')"        id="th-views"  data-label="Views">Views ↕</th>
         <th class="num" style="width:56px">RTs</th>
         <th class="num" style="width:64px">Replies / 💾BM</th>
-        <th class="num sortable" onclick="App.setSortAndLoad('growth')"   id="th-growth">LPH ↕</th>
-        <th class="num sortable" onclick="App.setSortAndLoad('acceleration')" id="th-accel">Accel ↕</th>
-        <th class="num sortable" onclick="App.setSortAndLoad('engagement')" id="th-eng">Eng%</th>
-        <th class="num sortable" onclick="App.setSortAndLoad('virality')" id="th-vscore">V-Score ↕</th>
+        <th class="num sortable" onclick="App.setSortAndLoad('growth')"       id="th-growth" data-label="LPH">LPH ↕</th>
+        <th class="num sortable" onclick="App.setSortAndLoad('acceleration')" id="th-accel"  data-label="Accel">Accel ↕</th>
+        <th class="num sortable" onclick="App.setSortAndLoad('engagement')"   id="th-eng"    data-label="Eng%">Eng% ↕</th>
+        <th class="num sortable" onclick="App.setSortAndLoad('virality')"     id="th-vscore" data-label="V-Score">V-Score ↕</th>
         <th>Status</th>
-        <th>Age</th>
+        <th class="num sortable" onclick="App.setSortAndLoad('newest')"       id="th-time"   data-label="Age">Age ↕</th>
         <th></th>
       </tr>
     </thead>

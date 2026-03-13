@@ -298,13 +298,20 @@ async function getTweets(filters = {}) {
   }
 
   const sortMap = {
-    acceleration: 'acceleration DESC, likes_per_hour DESC',
-    likes:        'likes DESC',
-    views:        'views DESC',
-    virality:     'virality_score DESC',
-    growth:       'likes_per_hour DESC',
-    newest:       'posted_at DESC',
-    engagement:   'engagement_rate DESC',
+    'acceleration':      'acceleration DESC, likes_per_hour DESC',
+    'acceleration:asc':  'acceleration ASC,  likes_per_hour ASC',
+    'likes':             'likes DESC',
+    'likes:asc':         'likes ASC',
+    'views':             'views DESC',
+    'views:asc':         'views ASC',
+    'virality':          'virality_score DESC',
+    'virality:asc':      'virality_score ASC',
+    'growth':            'likes_per_hour DESC',
+    'growth:asc':        'likes_per_hour ASC',
+    'newest':            'posted_at DESC',
+    'newest:asc':        'posted_at ASC',
+    'engagement':        'engagement_rate DESC',
+    'engagement:asc':    'engagement_rate ASC',
   };
   const orderBy = sortMap[filters.sort] || 'acceleration DESC, likes_per_hour DESC';
 
