@@ -281,7 +281,8 @@ async function getStats() {
       COALESCE(MAX(likes), 0)                              AS max_likes,
       COALESCE(MAX(views), 0)                              AS max_views,
       COALESCE(MAX(acceleration), 0)                       AS max_acceleration,
-      MAX(last_updated)                                    AS last_updated
+      MAX(last_updated)                                    AS last_updated,
+      (SELECT COUNT(*) FROM tweets)                        AS total_all_time
     FROM tweets
     WHERE posted_at > NOW() - INTERVAL '48 hours'
   `);

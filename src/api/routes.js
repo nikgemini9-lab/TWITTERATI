@@ -49,6 +49,8 @@ router.get('/stats', async (req, res) => {
           lastRefresh:    state.lastRefresh,
           fetchRunning:   state.fetchRunning,
           refreshRunning: state.refreshRunning,
+          lastFetchError: state.lastFetchError,
+          lastFetchCount: state.lastFetchCount,
         },
       },
     });

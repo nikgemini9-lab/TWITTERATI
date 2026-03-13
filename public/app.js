@@ -128,10 +128,64 @@ const App = (() => {
         dot.className = 'dot busy';
         footStatus.textContent = 'Updating…';
       }
-    } catch (_) {
-      document.getElementById('footDot').className = 'dot';
-      document.getElementById('footStatus').textContent = 'Offline';
+
+      return stats;
+    } catch (err) {
+      document.getElementById('footDot').className = 'dot err-dot';
+      document.getElementById('footStatus').textContent = `API error: ${err.message}`;
+      return null;
     }
+  }
+
+  // ─── Diagnostic panel (shown when feed is empty) ─────────────────────────────
+
+  function renderDiagnostic(stats) {
+    const s = stats?.scheduler || {};
+    const rows = [];
+
+    // Scheduler status
+    if (s.fetchRunning) {
+      rows.push(['Fetch status', '<span style="color:var(--orange)">⏳ Running now…</span>']);
+    } else if (s.lastFetch) {
+      rows.push(['Last fetch', `${timeAgo(s.lastFetch)} (${new Date(s.lastFetch).toLocaleTimeString()})`]);
+      rows.push(['Tweets fetched', s.lastFetchCount != null ? `${s.lastFetchCount} upserted` : 'unknown']);
+    } else {
+      rows.push(['Last fetch', '<span style="color:var(--red)">Never ran — still starting up or crashed</span>']);
+    }
+
+    if (s.lastFetchError) {
+      rows.push(['Fetch error', `<span style="color:var(--red)">${esc(s.lastFetchError)}</span>`]);
+    }
+
+    // DB counts
+    if (stats) {
+      const allTime = parseInt(stats.total_all_time, 10) || 0;
+      const window48 = parseInt(stats.total_tweets, 10) || 0;
+      if (allTime > 0 && window48 === 0) {
+        rows.push(['DB (all time)', `${allTime} tweets — but all older than 48 h (expand the time window?)`]);
+      } else {
+        rows.push(['DB (48 h window)', `${window48} tweets`]);
+        if (allTime > window48) rows.push(['DB (all time)', `${allTime} tweets`]);
+      }
+    }
+
+    const tableRows = rows.map(([k, v]) =>
+      `<tr><td style="color:var(--muted);padding:4px 12px 4px 0;white-space:nowrap">${k}</td><td>${v}</td></tr>`
+    ).join('');
+
+    return `
+      <div class="state-box">
+        <p>No tweets found</p>
+        <small style="margin-bottom:16px">Filters may be too narrow, or data hasn't been fetched yet.</small>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;margin:12px auto 0;max-width:480px;text-align:left">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:600;margin-bottom:10px">Diagnostics</div>
+          <table style="font-size:12px;border-collapse:collapse;width:100%">${tableRows}</table>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:8px;justify-content:center">
+          <button class="btn btn-primary" onclick="App.triggerRefresh('fetch')" style="font-size:12px;height:30px">Fetch New Tweets</button>
+          <button class="btn btn-ghost"   onclick="App.load()"                 style="font-size:12px;height:30px">Retry</button>
+        </div>
+      </div>`;
   }
 
   // ─── Tab counts ─────────────────────────────────────────────────────────────
@@ -175,27 +229,32 @@ const App = (() => {
     const feed = document.getElementById('feed');
     feed.innerHTML = '<div class="state-box"><div class="spinner"></div><p>Loading…</p></div>';
 
+    let stats = null;
     try {
-      const { tweets, count } = await apiFetch(`/api/tweets?${buildQuery()}`);
+      const [tweetsRes] = await Promise.all([
+        apiFetch(`/api/tweets?${buildQuery()}`),
+      ]);
+      const { tweets, count } = tweetsRes;
       allTweets = tweets;
       updateTabCounts(tweets);
-
       document.getElementById('footCount').textContent = `${count} tweets shown`;
 
       if (!tweets.length) {
-        feed.innerHTML = `<div class="state-box">
-          <p>No tweets found</p>
-          <small>Try broadening your filters or click "Fetch New" to pull fresh data.</small>
-        </div>`;
+        // Load stats to populate the diagnostic panel before rendering empty state
+        stats = await loadStats();
+        feed.innerHTML = renderDiagnostic(stats);
         return;
       }
 
       feed.innerHTML = tweets.map(renderCard).join('');
     } catch (err) {
+      stats = await loadStats();
       feed.innerHTML = `<div class="state-box">
-        <p style="color:var(--red)">Failed to load tweets</p>
-        <small>${err.message}</small>
+        <p style="color:var(--red)">⚠ Failed to load tweets</p>
+        <small style="color:var(--red)">${esc(err.message)}</small>
+        ${stats ? renderDiagnostic(stats).replace('<div class="state-box">', '<div>').replace('</div>', '</div>') : ''}
       </div>`;
+      return;
     }
 
     loadStats();
