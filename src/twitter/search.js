@@ -55,14 +55,27 @@ function tweetToMetrics(tweet) {
 async function fetchViralTweets() {
   const client = getClient();
 
+  // Anchor the search to the last 15 minutes.
+  //
+  // Without startDate, Twitter returns results in RELEVANCE order (not newest
+  // first). Our 200-tweet budget (10 pages × 20) gets filled by tweets from
+  // large verified accounts that score highest in Twitter's algorithm — a tweet
+  // from a small account like @trapbass_ with 22K likes gets buried and never
+  // appears in our results even though it passed the min_faves threshold.
+  //
+  // With startDate = now - 15min, every slot is a fresh tweet from the last
+  // fetch window. Nothing older competes for those slots.
+  const startDate = new Date(Date.now() - 15 * 60 * 1000);
+
   const filter = {
     minLikes:    config.minLikes,
     onlyOriginal: true,                                           // -filter:replies
+    startDate,
     ...(config.minRetweets > 0 && { minRetweets: config.minRetweets }),
     ...(config.language       && { language:     config.language }),
   };
 
-  console.log(`[Twitter] search filter: min_faves:${config.minLikes}${config.minRetweets > 0 ? ` min_retweets:${config.minRetweets}` : ''}${config.language ? ` lang:${config.language}` : ''} -filter:replies`);
+  console.log(`[Twitter] search filter: min_faves:${config.minLikes}${config.minRetweets > 0 ? ` min_retweets:${config.minRetweets}` : ''}${config.language ? ` lang:${config.language}` : ''} since:${startDate.toISOString()} -filter:replies`);
 
   let processed = 0;
   let cursor    = undefined;
