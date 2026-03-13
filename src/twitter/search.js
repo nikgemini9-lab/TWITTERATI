@@ -104,12 +104,9 @@ async function fetchViralTweets() {
     cursor = result?.next?.value;
     page++;
 
-    // Polite delay between pages (client-level delay already applied per-request,
-    // but an extra pause between pages reduces hammering)
-    if (cursor && page < MAX_PAGES) {
-      await sleep(500);
-    }
-  } while (cursor && page < config.maxPages);
+    // Polite delay between pages
+    if (cursor) await sleep(500);
+  } while (cursor);
 
   console.log(`[Twitter] fetchViralTweets → ${processed} tweets upserted (${page} pages)`);
   return processed;

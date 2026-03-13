@@ -5,7 +5,6 @@
 const config = {
   minLikes:    parseInt(process.env.MIN_LIKES,    10) || 2000,
   minRetweets: parseInt(process.env.MIN_RETWEETS, 10) || 0,
-  maxPages:    parseInt(process.env.MAX_PAGES,    10) || 10,
   language:    process.env.LANGUAGE || null,   // e.g. 'en' to restrict Twitter search to English
 };
 
