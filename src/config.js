@@ -4,7 +4,7 @@
 
 const config = {
   minLikes:  parseInt(process.env.MIN_LIKES,  10) || 3000,
-  hoursBack: parseInt(process.env.HOURS_BACK, 10) || 2,
+  hoursBack: parseInt(process.env.HOURS_BACK, 10) || 24,  // 24h window — viral tweets take hours to accumulate likes
   maxPages:  parseInt(process.env.MAX_PAGES,  10) || 10,
 };
 
