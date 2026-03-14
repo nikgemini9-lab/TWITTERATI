@@ -13,6 +13,7 @@ const App = (() => {
   let blacklist         = new Set();  // lowercase handles
   let radarCollapsed    = false;
   let activeTopicFilter = null;
+  let activeBadgeFilter = null; // 'meme' | 'viral' | null
   let tweetsById        = new Map();
   let previewHideTimer  = null;
   let memeHistory       = new Set(); // tweet_ids already marked
@@ -101,7 +102,7 @@ const App = (() => {
       normal:    ['b-n', '✓ Normal'],
     };
     const [cls, label] = map[status] || ['b-n', status];
-    return `<span class="badge ${cls}">${label}</span>`;
+    return `<span class="badge ${cls} clickable" onclick="App.setStatusTab('${status}')" title="Filter by ${label}">${label}</span>`;
   }
 
   // ─── Table row renderer ───────────────────────────────────────────────────────
@@ -168,7 +169,7 @@ const App = (() => {
         <div class="vscore-num">${fmt(score)}</div>
         <div class="vscore-bar-wrap"><div class="vscore-bar" style="width:${barPct}%"></div></div>
       </td>
-      <td>${badge(t.status)}${isMemeCandidate(t) ? ' <span class="badge b-m">🎭 Meme</span>' : ''}${viral ? ' <span class="badge b-viral">🚀 Viral</span>' : ''}</td>
+      <td>${badge(t.status)}${isMemeCandidate(t) ? ' <span class="badge b-m clickable" onclick="App.setBadgeFilter(\'meme\')" title="Filter by Meme">🎭 Meme</span>' : ''}${viral ? ' <span class="badge b-viral clickable" onclick="App.setBadgeFilter(\'viral\')" title="Filter by Viral">🚀 Viral</span>' : ''}</td>
       <td class="age-cell">${timeAgo(t.posted_at)}</td>
       <td class="action-cell">
         <a class="cbtn open" href="${esc(url)}" target="_blank" rel="noreferrer">↗</a>
@@ -421,7 +422,7 @@ const App = (() => {
       }
 
       maxVScore = Math.max(1, ...tweets.map(t => t.virality_score || 0));
-      tbody.innerHTML = tweets.map(renderRow).join('');
+      renderFilteredRows();
       window.scrollTo({ top: savedScroll, behavior: 'instant' });
     } catch (err) {
       const stats = await loadStats();
@@ -455,7 +456,45 @@ const App = (() => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
     activeTab = status;
+    activeBadgeFilter = null;
+    updateBadgeFilterBar();
     load();
+  }
+
+  function setStatusTab(status) {
+    const el = document.querySelector(`.tab[onclick*="'${status}'"]`);
+    if (el) setTab(el, status);
+  }
+
+  function setBadgeFilter(type) {
+    activeBadgeFilter = activeBadgeFilter === type ? null : type;
+    updateBadgeFilterBar();
+    renderFilteredRows();
+  }
+
+  function renderFilteredRows() {
+    const tbody = document.getElementById('feed');
+    let tweets = allTweets;
+    if (activeBadgeFilter === 'meme')  tweets = tweets.filter(isMemeCandidate);
+    if (activeBadgeFilter === 'viral') tweets = tweets.filter(isViralTweet);
+    tbody.innerHTML = tweets.length
+      ? tweets.map(renderRow).join('')
+      : `<tr><td colspan="14"><div class="state-box"><p style="color:var(--muted2)">No tweets match this filter.</p></div></td></tr>`;
+  }
+
+  function updateBadgeFilterBar() {
+    const bar = document.getElementById('badgeFilterBar');
+    if (!activeBadgeFilter) { bar.style.display = 'none'; return; }
+    const labels = { meme: '🎭 Meme', viral: '🚀 Viral' };
+    bar.style.display = 'flex';
+    bar.innerHTML = `<span>Filtering by: <strong>${labels[activeBadgeFilter]}</strong></span>
+      <span class="clear-filter" onclick="App.clearBadgeFilter()">✕ Clear filter</span>`;
+  }
+
+  function clearBadgeFilter() {
+    activeBadgeFilter = null;
+    updateBadgeFilterBar();
+    renderFilteredRows();
   }
 
   // ─── Search threshold ─────────────────────────────────────────────────────────
@@ -752,5 +791,5 @@ const App = (() => {
 
   document.addEventListener('DOMContentLoaded', init);
 
-  return { load, setTab, setSortAndLoad, triggerRefresh, openChart, closeModal, applySearchThreshold, toggleEnglish, blockHandle, unblockHandle, openBlacklist, closeBlacklist, addBlacklistFromInput, filterByTopic, toggleRadar, showPreview, startHidePreview, cancelHidePreview, hidePreview, toggleMeme };
+  return { load, setTab, setStatusTab, setSortAndLoad, setBadgeFilter, clearBadgeFilter, triggerRefresh, openChart, closeModal, applySearchThreshold, toggleEnglish, blockHandle, unblockHandle, openBlacklist, closeBlacklist, addBlacklistFromInput, filterByTopic, toggleRadar, showPreview, startHidePreview, cancelHidePreview, hidePreview, toggleMeme };
 })();
