@@ -84,10 +84,10 @@ async function fetchViralTweets() {
     onlyOriginal: true,                                           // -filter:replies
     startDate,
     ...(config.minRetweets > 0 && { minRetweets: config.minRetweets }),
-    ...(config.language       && { language:     config.language }),
+    // No language filter — catch all languages, user filters on dashboard
   };
 
-  console.log(`[Twitter] search filter: min_faves:${config.minLikes}${config.minRetweets > 0 ? ` min_retweets:${config.minRetweets}` : ''}${config.language ? ` lang:${config.language}` : ''} since:${startDate.toISOString()} -filter:replies`);
+  console.log(`[Twitter] search filter: min_faves:${config.minLikes}${config.minRetweets > 0 ? ` min_retweets:${config.minRetweets}` : ''} since:${startDate.toISOString()} -filter:replies (all languages)`);
 
   let processed = 0;
   let cursor    = undefined;

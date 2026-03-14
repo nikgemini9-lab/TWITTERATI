@@ -13,6 +13,8 @@ const App = (() => {
   let blacklist         = new Set();  // lowercase handles
   let radarCollapsed    = false;
   let activeTopicFilter = null;
+  let tweetsById        = new Map();
+  let previewHideTimer  = null;
 
   // ─── Formatters ──────────────────────────────────────────────────────────────
 
@@ -126,7 +128,7 @@ const App = (() => {
       ? `<span class="media-tag">${t.media_type || 'media'}</span> `
       : '';
 
-    return `<tr>
+    return `<tr onmouseenter="App.showPreview('${t.tweet_id}',this)" onmouseleave="App.startHidePreview()">
       <td class="rank">${i + 1}</td>
       <td class="author-cell">
         <div class="author-inner">
@@ -393,7 +395,8 @@ const App = (() => {
     try {
       let { tweets, count } = await apiFetch(`/api/tweets?${buildQuery()}`);
       if (englishOnly) tweets = tweets.filter(t => isLikelyEnglish(t.tweet_text));
-      allTweets = tweets;
+      allTweets  = tweets;
+      tweetsById = new Map(tweets.map(t => [t.tweet_id, t]));
       updateTabCounts(tweets);
       document.getElementById('footCount').textContent = `${tweets.length} tweets shown${englishOnly ? ' (EN only)' : ''}`;
 
@@ -447,11 +450,7 @@ const App = (() => {
       const { config } = await apiFetch('/api/config');
       if (config.minLikes)                  document.getElementById('searchMinLikes').value    = config.minLikes;
       if (config.minRetweets !== undefined) document.getElementById('searchMinRetweets').value = config.minRetweets;
-      // Also sync display filter
       document.getElementById('filterMinLikes').value = config.minLikes || 10000;
-      // Sync English toggle
-      englishOnly = config.language === 'en';
-      syncEnglishBtn();
     } catch (_) {}
   }
 
@@ -478,32 +477,11 @@ const App = (() => {
 
   // ─── English-only toggle ─────────────────────────────────────────────────────
 
-  async function toggleEnglish() {
+  function toggleEnglish() {
     englishOnly = !englishOnly;
     syncEnglishBtn();
-
-    try {
-      const res  = await fetch('/api/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language: englishOnly ? 'en' : null }),
-      });
-      const data = await res.json();
-      if (!data.ok) { showToast('Failed: ' + data.error, 'err'); return; }
-
-      if (englishOnly) {
-        showToast('English only — filtering display & next fetch will use lang:en', 'ok');
-      } else {
-        showToast('All languages enabled', 'inf');
-      }
-
-      // Re-render current tweets with new filter (instant visual feedback)
-      load();
-    } catch (err) {
-      showToast('Failed: ' + err.message, 'err');
-      englishOnly = !englishOnly;   // revert on error
-      syncEnglishBtn();
-    }
+    showToast(englishOnly ? 'English only (display filter)' : 'All languages shown', englishOnly ? 'ok' : 'inf');
+    load();
   }
 
   // ─── Manual refresh ───────────────────────────────────────────────────────────
@@ -642,6 +620,65 @@ const App = (() => {
     if (inp) inp.value = '';
   }
 
+  // ─── Tweet Preview Popup ─────────────────────────────────────────────────────
+
+  function showPreview(tweetId, rowEl) {
+    clearTimeout(previewHideTimer);
+    const t = tweetsById.get(tweetId);
+    if (!t) return;
+
+    const pv = document.getElementById('tweetPreview');
+
+    // Populate content
+    document.getElementById('pvAvatar').textContent = avatarLetter(t.author_handle);
+    document.getElementById('pvName').textContent   = t.author_name || t.author_handle || '—';
+    document.getElementById('pvHandle').textContent = t.author_handle ? `@${t.author_handle}` : '';
+    document.getElementById('pvText').textContent   = t.tweet_text || '';
+    document.getElementById('pvAge').textContent    = timeAgo(t.posted_at);
+    document.getElementById('pvBadge').innerHTML    = badge(t.status) + (isMemeCandidate(t) ? ' <span class="badge b-m">🎭 Meme</span>' : '');
+    const a = document.getElementById('pvOpen');
+    a.href = t.tweet_url || '#';
+
+    const stats = [
+      ['❤️', fmt(t.likes)],
+      ['🔁', fmt(t.retweets)],
+      ['👁', fmt(t.views)],
+      ['💬', fmt(t.replies)],
+    ];
+    if (t.bookmarks > 0) stats.push(['🔖', fmt(t.bookmarks)]);
+    document.getElementById('pvStats').innerHTML = stats.map(
+      ([icon, val]) => `<span>${icon} <span class="pv-sv">${val}</span></span>`
+    ).join('');
+
+    // Position: below row by default, above if near bottom
+    const rect = rowEl.getBoundingClientRect();
+    const pvW  = 340;
+    const pvH  = pv.offsetHeight || 300;
+
+    let left = rect.left + 160;
+    let top  = rect.bottom + 6;
+    if (top + pvH > window.innerHeight - 70) top = rect.top - pvH - 6;
+    if (top < 70) top = 70;
+    if (left + pvW > window.innerWidth - 8) left = window.innerWidth - pvW - 8;
+    if (left < 8) left = 8;
+
+    pv.style.left = left + 'px';
+    pv.style.top  = top  + 'px';
+    pv.classList.add('visible');
+  }
+
+  function startHidePreview() {
+    previewHideTimer = setTimeout(hidePreview, 120);
+  }
+
+  function cancelHidePreview() {
+    clearTimeout(previewHideTimer);
+  }
+
+  function hidePreview() {
+    document.getElementById('tweetPreview')?.classList.remove('visible');
+  }
+
   // ─── Toast ────────────────────────────────────────────────────────────────────
 
   function showToast(msg, type = 'ok') {
@@ -668,5 +705,5 @@ const App = (() => {
 
   document.addEventListener('DOMContentLoaded', init);
 
-  return { load, setTab, setSortAndLoad, triggerRefresh, openChart, closeModal, applySearchThreshold, toggleEnglish, blockHandle, unblockHandle, openBlacklist, closeBlacklist, addBlacklistFromInput, filterByTopic, toggleRadar };
+  return { load, setTab, setSortAndLoad, triggerRefresh, openChart, closeModal, applySearchThreshold, toggleEnglish, blockHandle, unblockHandle, openBlacklist, closeBlacklist, addBlacklistFromInput, filterByTopic, toggleRadar, showPreview, startHidePreview, cancelHidePreview, hidePreview };
 })();
