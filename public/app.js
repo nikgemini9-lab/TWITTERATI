@@ -77,6 +77,11 @@ const App = (() => {
   //
   // "Albert Whiskars" (@trapbass_): bookmark ratio 7.7%, RT:reply 37:1, 12 chars → would flag
 
+  const VIRAL_RE = /\b(x trend|trending|gone viral|going viral|viral|blowing up|blew up)\b/i;
+  function isViralTweet(t) {
+    return VIRAL_RE.test(t.tweet_text || '');
+  }
+
   function isMemeCandidate(t) {
     if (!t.has_media) return false;
     const bookmarkRatio = t.likes > 0 ? t.bookmarks / t.likes : 0;
@@ -130,7 +135,8 @@ const App = (() => {
       : '';
 
     const isMarked = memeHistory.has(t.tweet_id);
-    return `<tr onmouseenter="App.showPreview('${t.tweet_id}',this)" onmouseleave="App.startHidePreview()">
+    const viral    = isViralTweet(t);
+    return `<tr class="${viral ? 'row-viral' : ''}" onmouseenter="App.showPreview('${t.tweet_id}',this)" onmouseleave="App.startHidePreview()">
       <td class="meme-col">
         <input type="checkbox" class="meme-cb" title="Mark: meme created from this tweet"
           ${isMarked ? 'checked' : ''}
@@ -162,7 +168,7 @@ const App = (() => {
         <div class="vscore-num">${fmt(score)}</div>
         <div class="vscore-bar-wrap"><div class="vscore-bar" style="width:${barPct}%"></div></div>
       </td>
-      <td>${badge(t.status)}${isMemeCandidate(t) ? ' <span class="badge b-m">🎭 Meme</span>' : ''}</td>
+      <td>${badge(t.status)}${isMemeCandidate(t) ? ' <span class="badge b-m">🎭 Meme</span>' : ''}${viral ? ' <span class="badge b-viral">🚀 Viral</span>' : ''}</td>
       <td class="age-cell">${timeAgo(t.posted_at)}</td>
       <td class="action-cell">
         <a class="cbtn open" href="${esc(url)}" target="_blank" rel="noreferrer">↗</a>
@@ -397,6 +403,7 @@ const App = (() => {
     highlightSort(activeSort, sortDir);
 
     const tbody = document.getElementById('feed');
+    const savedScroll = window.scrollY;
     tbody.innerHTML = `<tr><td colspan="14"><div class="state-box"><div class="spinner"></div><p>Loading…</p></div></td></tr>`;
 
     try {
@@ -415,6 +422,7 @@ const App = (() => {
 
       maxVScore = Math.max(1, ...tweets.map(t => t.virality_score || 0));
       tbody.innerHTML = tweets.map(renderRow).join('');
+      window.scrollTo({ top: savedScroll, behavior: 'instant' });
     } catch (err) {
       const stats = await loadStats();
       tbody.innerHTML = `<tr><td colspan="14"><div class="state-box">
