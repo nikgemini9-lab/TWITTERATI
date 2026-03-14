@@ -721,6 +721,15 @@ const App = (() => {
     document.getElementById('pvText').textContent   = t.tweet_text || '';
     document.getElementById('pvAge').textContent    = timeAgo(t.posted_at);
     document.getElementById('pvBadge').innerHTML    = badge(t.status) + (isMemeCandidate(t) ? ' <span class="badge b-m">🎭 Meme</span>' : '');
+
+    const pvMedia = document.getElementById('pvMedia');
+    if (t.media_url) {
+      pvMedia.innerHTML = `<img src="${esc(t.media_url)}" alt="media" loading="lazy" onerror="this.parentElement.innerHTML=''">`;
+    } else if (t.has_media) {
+      pvMedia.innerHTML = `<span class="pv-media-type">${t.media_type || 'media'} (no preview)</span>`;
+    } else {
+      pvMedia.innerHTML = '';
+    }
     const a = document.getElementById('pvOpen');
     a.href = t.tweet_url || '#';
 
@@ -737,7 +746,7 @@ const App = (() => {
 
     // Position: below row by default, above if near bottom
     const rect = rowEl.getBoundingClientRect();
-    const pvW  = 340;
+    const pvW  = 360;
     const pvH  = pv.offsetHeight || 300;
 
     let left = rect.left + 160;

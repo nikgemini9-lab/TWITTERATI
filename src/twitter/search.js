@@ -26,6 +26,10 @@ function tweetToRecord(tweet) {
   const hasMedia  = mediaList.length > 0;
   // MediaType enum values: 'Photo' | 'Video' | 'Gif'  (capitalised in rettiwt-api)
   const mediaType = hasMedia ? mediaList[0].type?.toLowerCase() : null;
+  // For photos use .url directly; for video/gif use .thumbnailUrl as preview
+  const mediaUrl  = hasMedia
+    ? (mediaList[0].thumbnailUrl || mediaList[0].url || null)
+    : null;
 
   return {
     tweet_id:      tweet.id,
@@ -45,6 +49,7 @@ function tweetToRecord(tweet) {
                            : null),
     has_media:  hasMedia,
     media_type: mediaType,
+    media_url:  mediaUrl,
   };
 }
 

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS tweets (
   tweet_url       TEXT,
   has_media       BOOLEAN NOT NULL DEFAULT FALSE,
   media_type      TEXT,
+  media_url       TEXT,
   -- Growth fields updated by scheduler
   status          TEXT NOT NULL DEFAULT 'normal',  -- normal | warming | fast | parabolic | fading
   likes_per_hour  NUMERIC NOT NULL DEFAULT 0,
@@ -29,6 +30,7 @@ CREATE TABLE IF NOT EXISTS tweets (
 
 -- Migrate existing DBs: add new columns if they don't exist yet
 ALTER TABLE tweets ADD COLUMN IF NOT EXISTS acceleration    NUMERIC NOT NULL DEFAULT 0;
+ALTER TABLE tweets ADD COLUMN IF NOT EXISTS media_url       TEXT;
 ALTER TABLE tweets ADD COLUMN IF NOT EXISTS engagement_rate NUMERIC NOT NULL DEFAULT 0;
 ALTER TABLE tweets ADD COLUMN IF NOT EXISTS rt_ratio        NUMERIC NOT NULL DEFAULT 0;
 

@@ -72,9 +72,9 @@ async function upsertTweet(data) {
     `INSERT INTO tweets (
        tweet_id, author_handle, author_name, tweet_text,
        likes, retweets, replies, views, bookmarks, quotes,
-       posted_at, tweet_url, has_media, media_type,
+       posted_at, tweet_url, has_media, media_type, media_url,
        engagement_rate, rt_ratio, virality_score, last_updated
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,NOW())
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW())
      ON CONFLICT (tweet_id) DO UPDATE SET
        likes          = EXCLUDED.likes,
        retweets       = EXCLUDED.retweets,
@@ -91,7 +91,8 @@ async function upsertTweet(data) {
        tweet_text     = COALESCE(EXCLUDED.tweet_text, tweets.tweet_text),
        tweet_url      = COALESCE(EXCLUDED.tweet_url,  tweets.tweet_url),
        has_media      = COALESCE(EXCLUDED.has_media,  tweets.has_media),
-       media_type     = COALESCE(EXCLUDED.media_type, tweets.media_type)`,
+       media_type     = COALESCE(EXCLUDED.media_type, tweets.media_type),
+       media_url      = COALESCE(EXCLUDED.media_url,  tweets.media_url)`,
     [
       data.tweet_id,
       data.author_handle || '',
@@ -107,6 +108,7 @@ async function upsertTweet(data) {
       data.tweet_url     || null,
       data.has_media     || false,
       data.media_type    || null,
+      data.media_url     || null,
       parseFloat(engagement_rate.toFixed(4)),
       parseFloat(rt_ratio.toFixed(4)),
       score,
