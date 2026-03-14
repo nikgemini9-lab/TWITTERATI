@@ -158,7 +158,6 @@ const App = (() => {
       </td>
       <td class="num">${lphHtml}</td>
       <td class="num">${accelHtml}</td>
-      <td class="num"><span class="num-muted">${engPct}</span></td>
       <td class="num vscore-cell">
         <div class="vscore-num">${fmt(score)}</div>
         <div class="vscore-bar-wrap"><div class="vscore-bar" style="width:${barPct}%"></div></div>
@@ -166,7 +165,6 @@ const App = (() => {
       <td>${badge(t.status)}${isMemeCandidate(t) ? ' <span class="badge b-m">🎭 Meme</span>' : ''}</td>
       <td class="age-cell">${timeAgo(t.posted_at)}</td>
       <td class="action-cell">
-        <button class="cbtn" onclick="App.openChart('${t.tweet_id}','${esc(handle)}','${esc(url)}')">Chart</button>
         <a class="cbtn open" href="${esc(url)}" target="_blank" rel="noreferrer">↗</a>
         <button class="cbtn block-btn" title="Blacklist ${esc(handle)}" onclick="App.blockHandle('${esc(t.author_handle)}')">🚫</button>
       </td>
