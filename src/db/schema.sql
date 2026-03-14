@@ -61,3 +61,28 @@ CREATE TABLE IF NOT EXISTS blacklist (
 -- Topic classification (populated by AI classifier after each fetch cycle)
 ALTER TABLE tweets ADD COLUMN IF NOT EXISTS topic TEXT;
 CREATE INDEX IF NOT EXISTS idx_tweets_topic ON tweets(topic);
+
+-- Meme History — tweets manually marked as "meme was created from this"
+-- Stores a full snapshot so analysis works even after tweets age out of the main table
+CREATE TABLE IF NOT EXISTS meme_history (
+  tweet_id        TEXT PRIMARY KEY,
+  author_handle   TEXT,
+  author_name     TEXT,
+  tweet_text      TEXT,
+  likes           INTEGER DEFAULT 0,
+  retweets        INTEGER DEFAULT 0,
+  replies         INTEGER DEFAULT 0,
+  views           INTEGER DEFAULT 0,
+  bookmarks       INTEGER DEFAULT 0,
+  has_media       BOOLEAN DEFAULT FALSE,
+  media_type      TEXT,
+  status          TEXT,
+  virality_score  NUMERIC DEFAULT 0,
+  engagement_rate NUMERIC DEFAULT 0,
+  rt_ratio        NUMERIC DEFAULT 0,
+  likes_per_hour  NUMERIC DEFAULT 0,
+  topic           TEXT,
+  tweet_url       TEXT,
+  posted_at       TIMESTAMPTZ,
+  marked_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

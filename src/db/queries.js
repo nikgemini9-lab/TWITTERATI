@@ -462,6 +462,42 @@ async function getTopicStats() {
   return rows;
 }
 
+// ─── Meme History CRUD ────────────────────────────────────────────────────────
+
+async function getMemeHistory() {
+  const { rows } = await db.query(`
+    SELECT * FROM meme_history ORDER BY marked_at DESC
+  `);
+  return rows;
+}
+
+async function addToMemeHistory(tweet) {
+  await db.query(`
+    INSERT INTO meme_history (
+      tweet_id, author_handle, author_name, tweet_text,
+      likes, retweets, replies, views, bookmarks,
+      has_media, media_type, status, virality_score,
+      engagement_rate, rt_ratio, likes_per_hour,
+      topic, tweet_url, posted_at
+    ) VALUES (
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
+    ) ON CONFLICT (tweet_id) DO NOTHING`,
+    [
+      tweet.tweet_id, tweet.author_handle, tweet.author_name, tweet.tweet_text,
+      tweet.likes || 0, tweet.retweets || 0, tweet.replies || 0,
+      tweet.views || 0, tweet.bookmarks || 0,
+      tweet.has_media || false, tweet.media_type || null,
+      tweet.status || null, tweet.virality_score || 0,
+      tweet.engagement_rate || 0, tweet.rt_ratio || 0, tweet.likes_per_hour || 0,
+      tweet.topic || null, tweet.tweet_url || null, tweet.posted_at || null,
+    ]
+  );
+}
+
+async function removeFromMemeHistory(tweetId) {
+  await db.query(`DELETE FROM meme_history WHERE tweet_id = $1`, [tweetId]);
+}
+
 module.exports = {
   upsertTweet,
   insertSnapshot,
@@ -477,4 +513,7 @@ module.exports = {
   getUnclassifiedTweets,
   bulkSetTopics,
   getTopicStats,
+  getMemeHistory,
+  addToMemeHistory,
+  removeFromMemeHistory,
 };

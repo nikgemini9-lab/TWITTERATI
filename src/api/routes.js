@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { getTweets, getTweetHistory, getStats, getBlacklist, addToBlacklist, removeFromBlacklist, getTopicStats } = require('../db/queries');
+const { getTweets, getTweetHistory, getStats, getBlacklist, addToBlacklist, removeFromBlacklist, getTopicStats, getMemeHistory, addToMemeHistory, removeFromMemeHistory } = require('../db/queries');
 const { runFetch, runRefresh, state } = require('../scheduler');
 const config = require('../config');
 
@@ -155,6 +155,46 @@ router.get('/topics', async (req, res) => {
     res.json({ ok: true, count: topics.length, topics });
   } catch (err) {
     console.error('[API] GET /topics:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── GET /api/meme-history ────────────────────────────────────────────────────
+
+router.get('/meme-history', async (req, res) => {
+  try {
+    const rows = await getMemeHistory();
+    res.json({ ok: true, count: rows.length, tweets: rows });
+  } catch (err) {
+    console.error('[API] GET /meme-history:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── POST /api/meme-history ───────────────────────────────────────────────────
+// Body: full tweet object (snapshot captured at mark time)
+
+router.post('/meme-history', async (req, res) => {
+  try {
+    const tweet = req.body;
+    if (!tweet?.tweet_id) return res.status(400).json({ ok: false, error: 'tweet_id required' });
+    await addToMemeHistory(tweet);
+    console.log(`[API] Meme marked: ${tweet.tweet_id} @${tweet.author_handle}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[API] POST /meme-history:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── DELETE /api/meme-history/:id ─────────────────────────────────────────────
+
+router.delete('/meme-history/:id', async (req, res) => {
+  try {
+    await removeFromMemeHistory(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[API] DELETE /meme-history:', err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
 });

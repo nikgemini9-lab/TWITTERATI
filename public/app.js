@@ -15,6 +15,7 @@ const App = (() => {
   let activeTopicFilter = null;
   let tweetsById        = new Map();
   let previewHideTimer  = null;
+  let memeHistory       = new Set(); // tweet_ids already marked
 
   // ─── Formatters ──────────────────────────────────────────────────────────────
 
@@ -128,7 +129,13 @@ const App = (() => {
       ? `<span class="media-tag">${t.media_type || 'media'}</span> `
       : '';
 
+    const isMarked = memeHistory.has(t.tweet_id);
     return `<tr onmouseenter="App.showPreview('${t.tweet_id}',this)" onmouseleave="App.startHidePreview()">
+      <td class="meme-col">
+        <input type="checkbox" class="meme-cb" title="Mark: meme created from this tweet"
+          ${isMarked ? 'checked' : ''}
+          onclick="App.toggleMeme('${t.tweet_id}',this)">
+      </td>
       <td class="rank">${i + 1}</td>
       <td class="author-cell">
         <div class="author-inner">
@@ -350,8 +357,10 @@ const App = (() => {
 
   // ─── API helpers ─────────────────────────────────────────────────────────────
 
-  async function apiFetch(url) {
-    const res = await fetch(url);
+  async function apiFetch(url, opts = {}) {
+    const options = { ...opts };
+    if (options.body && !options.headers) options.headers = { 'Content-Type': 'application/json' };
+    const res = await fetch(url, options);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
@@ -450,7 +459,7 @@ const App = (() => {
       const { config } = await apiFetch('/api/config');
       if (config.minLikes)                  document.getElementById('searchMinLikes').value    = config.minLikes;
       if (config.minRetweets !== undefined) document.getElementById('searchMinRetweets').value = config.minRetweets;
-      document.getElementById('filterMinLikes').value = config.minLikes || 10000;
+      document.getElementById('filterMinLikes').value = config.minLikes || 12000;
     } catch (_) {}
   }
 
@@ -546,6 +555,37 @@ const App = (() => {
   function closeModal(e) {
     if (e && e.target !== document.getElementById('chartModal')) return;
     document.getElementById('chartModal').classList.remove('open');
+  }
+
+  // ─── Meme History ─────────────────────────────────────────────────────────────
+
+  async function loadMemeHistory() {
+    try {
+      const data = await apiFetch('/api/meme-history');
+      memeHistory = new Set((data.tweets || []).map(t => t.tweet_id));
+    } catch (err) {
+      console.warn('[Meme] Failed to load meme history:', err.message);
+    }
+  }
+
+  async function toggleMeme(tweetId, cbEl) {
+    const t = tweetsById.get(tweetId);
+    if (!t) return;
+    const marking = cbEl.checked;
+    try {
+      if (marking) {
+        await apiFetch('/api/meme-history', { method: 'POST', body: JSON.stringify(t) });
+        memeHistory.add(tweetId);
+        showToast('Meme marked ✓ — saved to history', 'ok');
+      } else {
+        await apiFetch(`/api/meme-history/${tweetId}`, { method: 'DELETE' });
+        memeHistory.delete(tweetId);
+        showToast('Meme mark removed', 'inf');
+      }
+    } catch (err) {
+      cbEl.checked = !marking; // revert on error
+      showToast('Failed: ' + err.message, 'err');
+    }
   }
 
   // ─── Blacklist ────────────────────────────────────────────────────────────────
@@ -696,6 +736,7 @@ const App = (() => {
     loadTopics();
     loadConfig();
     loadBlacklist();
+    loadMemeHistory();
     autoTimer = setInterval(() => { load(); loadTopics(); }, 90_000);
     ['filterAuthor', 'filterMinLikes'].forEach(id => {
       document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') load(); });
@@ -705,5 +746,5 @@ const App = (() => {
 
   document.addEventListener('DOMContentLoaded', init);
 
-  return { load, setTab, setSortAndLoad, triggerRefresh, openChart, closeModal, applySearchThreshold, toggleEnglish, blockHandle, unblockHandle, openBlacklist, closeBlacklist, addBlacklistFromInput, filterByTopic, toggleRadar, showPreview, startHidePreview, cancelHidePreview, hidePreview };
+  return { load, setTab, setSortAndLoad, triggerRefresh, openChart, closeModal, applySearchThreshold, toggleEnglish, blockHandle, unblockHandle, openBlacklist, closeBlacklist, addBlacklistFromInput, filterByTopic, toggleRadar, showPreview, startHidePreview, cancelHidePreview, hidePreview, toggleMeme };
 })();
