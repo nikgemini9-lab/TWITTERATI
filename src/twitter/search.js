@@ -1,9 +1,21 @@
 const { getClient } = require('./client');
-const { upsertTweet, insertSnapshot, getTweetIdsForRefresh, recalculateGrowth } = require('../db/queries');
+const { upsertTweet, insertSnapshot, getTweetIdsForRefresh, recalculateGrowth, getUnclassifiedTweets, bulkSetTopics } = require('../db/queries');
+const { batchClassifyTweets } = require('../ai/classifier');
 const config = require('../config');
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function classifyNewTweets() {
+  const tweets = await getUnclassifiedTweets(50);
+  if (!tweets.length) return;
+  console.log(`[AI] Classifying ${tweets.length} unclassified tweets…`);
+  const results = await batchClassifyTweets(tweets);
+  if (results.length) {
+    await bulkSetTopics(results);
+    console.log(`[AI] Topics set for ${results.length} tweets`);
+  }
 }
 
 // Map a Rettiwt Tweet object → our DB record shape
@@ -109,6 +121,7 @@ async function fetchViralTweets() {
   } while (cursor);
 
   console.log(`[Twitter] fetchViralTweets → ${processed} tweets upserted (${page} pages)`);
+  classifyNewTweets().catch(err => console.error('[AI] classifyNewTweets error:', err.message));
   return processed;
 }
 
@@ -157,6 +170,7 @@ async function refreshTrackedTweets() {
   // Recompute growth rates + parabolic status in DB
   const recalced = await recalculateGrowth();
   console.log(`[Twitter] refreshTrackedTweets → ${updated} updated, ${recalced} growth rows recalculated`);
+  classifyNewTweets().catch(err => console.error('[AI] classifyNewTweets error:', err.message));
   return updated;
 }
 

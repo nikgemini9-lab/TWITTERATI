@@ -57,3 +57,7 @@ CREATE TABLE IF NOT EXISTS blacklist (
   handle    TEXT PRIMARY KEY,
   added_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Topic classification (populated by AI classifier after each fetch cycle)
+ALTER TABLE tweets ADD COLUMN IF NOT EXISTS topic TEXT;
+CREATE INDEX IF NOT EXISTS idx_tweets_topic ON tweets(topic);

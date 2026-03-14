@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { getTweets, getTweetHistory, getStats, getBlacklist, addToBlacklist, removeFromBlacklist } = require('../db/queries');
+const { getTweets, getTweetHistory, getStats, getBlacklist, addToBlacklist, removeFromBlacklist, getTopicStats } = require('../db/queries');
 const { runFetch, runRefresh, state } = require('../scheduler');
 const config = require('../config');
 
@@ -145,6 +145,18 @@ router.post('/refresh', async (req, res) => {
   }
 
   res.json({ ok: true, message: `${type} job started` });
+});
+
+// ─── GET /api/topics ──────────────────────────────────────────────────────────
+
+router.get('/topics', async (req, res) => {
+  try {
+    const topics = await getTopicStats();
+    res.json({ ok: true, count: topics.length, topics });
+  } catch (err) {
+    console.error('[API] GET /topics:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 module.exports = router;

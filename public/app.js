@@ -1,16 +1,18 @@
 /* global Chart */
 
 const App = (() => {
-  let activeTab    = 'all';
-  let activeSort   = 'virality';
-  let sortDir      = 'desc';   // 'desc' | 'asc'
-  let autoTimer    = null;
-  let likesChart   = null;
-  let viewsChart   = null;
-  let allTweets    = [];
-  let maxVScore    = 1;   // for the V-score bar scaling
-  let englishOnly  = false;
-  let blacklist    = new Set();  // lowercase handles
+  let activeTab         = 'all';
+  let activeSort        = 'virality';
+  let sortDir           = 'desc';   // 'desc' | 'asc'
+  let autoTimer         = null;
+  let likesChart        = null;
+  let viewsChart        = null;
+  let allTweets         = [];
+  let maxVScore         = 1;   // for the V-score bar scaling
+  let englishOnly       = false;
+  let blacklist         = new Set();  // lowercase handles
+  let radarCollapsed    = false;
+  let activeTopicFilter = null;
 
   // ─── Formatters ──────────────────────────────────────────────────────────────
 
@@ -162,6 +164,74 @@ const App = (() => {
     </tr>`;
   }
 
+  // ─── Topic Radar ─────────────────────────────────────────────────────────────
+
+  async function loadTopics() {
+    try {
+      const { topics, count } = await apiFetch('/api/topics');
+      const subtitle = document.getElementById('radarSubtitle');
+      if (subtitle) subtitle.textContent = `${count} active topic${count !== 1 ? 's' : ''} · last 48h`;
+      renderTopicRadar(topics);
+    } catch (err) {
+      const grid = document.getElementById('radarGrid');
+      if (grid) grid.innerHTML = `<span class="tc-loading" style="color:var(--red)">Topic Radar unavailable</span>`;
+    }
+  }
+
+  function renderTopicRadar(topics) {
+    const grid = document.getElementById('radarGrid');
+    if (!grid) return;
+
+    if (!topics || !topics.length) {
+      grid.innerHTML = '<span class="tc-loading">No topic data yet — classification runs after the next fetch cycle.</span>';
+      return;
+    }
+
+    grid.innerHTML = topics.map(t => {
+      const statusClass = `tc-${t.hottest_status || 'normal'}`;
+      const isActive    = activeTopicFilter === t.topic;
+      const borderStyle = isActive ? 'outline:2px solid var(--accent)' : '';
+
+      return `<div class="topic-card ${statusClass}"
+                   style="${borderStyle}"
+                   onclick="App.filterByTopic(${JSON.stringify(t.topic)})"
+                   title="Click to filter tweets by ${esc(t.topic)}">
+        <div class="tc-name">${esc(t.topic)}</div>
+        <div class="tc-stats">
+          <span class="tc-count">${fmt(t.tweet_count)} tweets</span>
+          <span class="tc-vscore">${fmt(Math.round(t.avg_virality || 0))} avg V</span>
+        </div>
+        <div style="margin-top:5px">
+          ${badge(t.hottest_status || 'normal')}
+          ${t.top_tweet_url ? `<a href="${esc(t.top_tweet_url)}" target="_blank" rel="noreferrer"
+              style="font-size:9px;color:var(--accent);text-decoration:none;margin-left:5px"
+              onclick="event.stopPropagation()">↗ top</a>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function filterByTopic(topic) {
+    if (activeTopicFilter === topic) {
+      activeTopicFilter = null;
+      showToast('Topic filter cleared', 'inf');
+    } else {
+      activeTopicFilter = topic;
+      showToast(`Filtering by: ${topic}`, 'ok');
+    }
+    renderTopicRadar(null);   // re-render to show active state; loadTopics will refresh fully
+    loadTopics();
+    load();
+  }
+
+  function toggleRadar() {
+    radarCollapsed = !radarCollapsed;
+    const grid = document.getElementById('radarGrid');
+    const icon = document.getElementById('radarToggleIcon');
+    if (grid) grid.classList.toggle('collapsed', radarCollapsed);
+    if (icon) icon.textContent = radarCollapsed ? '▼ show' : '▲ hide';
+  }
+
   // ─── Stats header ─────────────────────────────────────────────────────────────
 
   async function loadStats() {
@@ -299,7 +369,8 @@ const App = (() => {
     }
     if (media)    p.set('media', media);
     if (minLikes) p.set('min_likes', minLikes);
-    if (author)   p.set('author',    author.replace(/^@/, ''));
+    if (author)             p.set('author',    author.replace(/^@/, ''));
+    if (activeTopicFilter)  p.set('topic',     activeTopicFilter);
     p.set('limit', '1000');
     return p.toString();
   }
@@ -585,9 +656,10 @@ const App = (() => {
   function init() {
     load();
     loadStats();
+    loadTopics();
     loadConfig();
     loadBlacklist();
-    autoTimer = setInterval(load, 90_000);
+    autoTimer = setInterval(() => { load(); loadTopics(); }, 90_000);
     ['filterAuthor', 'filterMinLikes'].forEach(id => {
       document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') load(); });
     });
@@ -596,5 +668,5 @@ const App = (() => {
 
   document.addEventListener('DOMContentLoaded', init);
 
-  return { load, setTab, setSortAndLoad, triggerRefresh, openChart, closeModal, applySearchThreshold, toggleEnglish, blockHandle, unblockHandle, openBlacklist, closeBlacklist, addBlacklistFromInput };
+  return { load, setTab, setSortAndLoad, triggerRefresh, openChart, closeModal, applySearchThreshold, toggleEnglish, blockHandle, unblockHandle, openBlacklist, closeBlacklist, addBlacklistFromInput, filterByTopic, toggleRadar };
 })();

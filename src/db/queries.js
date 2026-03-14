@@ -305,6 +305,11 @@ async function getTweets(filters = {}) {
     params.push(`%${filters.author}%`);
   }
 
+  if (filters.topic) {
+    conditions.push(`topic = $${idx++}`);
+    params.push(filters.topic);
+  }
+
   const sortMap = {
     'acceleration':      'acceleration DESC, likes_per_hour DESC',
     'acceleration:asc':  'acceleration ASC,  likes_per_hour ASC',
@@ -391,6 +396,72 @@ async function removeFromBlacklist(handle) {
   await db.query(`DELETE FROM blacklist WHERE handle = $1`, [h]);
 }
 
+// ─── Topic classification helpers ─────────────────────────────────────────────
+
+async function getUnclassifiedTweets(limit = 50) {
+  const { rows } = await db.query(
+    `SELECT tweet_id, tweet_text
+     FROM tweets
+     WHERE topic IS NULL
+       AND tweet_text IS NOT NULL
+       AND tweet_text != ''
+     ORDER BY virality_score DESC
+     LIMIT $1`,
+    [limit]
+  );
+  return rows;
+}
+
+async function bulkSetTopics(results) {
+  if (!results.length) return;
+  const cases    = results.map((_, i) => `WHEN $${i * 2 + 1} THEN $${i * 2 + 2}`).join(' ');
+  const ids      = results.map(r => r.tweet_id);
+  const params   = results.flatMap(r => [r.tweet_id, r.topic]);
+  const idParams = ids.map((_, i) => `$${results.length * 2 + i + 1}`).join(',');
+  await db.query(
+    `UPDATE tweets SET topic = CASE tweet_id ${cases} END WHERE tweet_id IN (${idParams})`,
+    [...params, ...ids]
+  );
+}
+
+async function getTopicStats() {
+  const { rows } = await db.query(`
+    SELECT
+      topic,
+      COUNT(*)                                      AS tweet_count,
+      ROUND(AVG(virality_score)::NUMERIC, 0)        AS avg_virality,
+      MAX(likes)                                    AS max_likes,
+      MAX(virality_score)                           AS max_virality,
+      (SELECT tweet_url
+       FROM tweets t2
+       WHERE t2.topic = t.topic
+         AND t2.posted_at > NOW() - INTERVAL '48 hours'
+         AND t2.tweet_url IS NOT NULL
+       ORDER BY t2.virality_score DESC
+       LIMIT 1)                                     AS top_tweet_url,
+      jsonb_build_object(
+        'parabolic', COUNT(*) FILTER (WHERE status = 'parabolic'),
+        'fast',      COUNT(*) FILTER (WHERE status = 'fast'),
+        'warming',   COUNT(*) FILTER (WHERE status = 'warming'),
+        'normal',    COUNT(*) FILTER (WHERE status = 'normal'),
+        'fading',    COUNT(*) FILTER (WHERE status = 'fading')
+      )                                             AS status_mix,
+      (CASE
+        WHEN COUNT(*) FILTER (WHERE status = 'parabolic') > 0 THEN 'parabolic'
+        WHEN COUNT(*) FILTER (WHERE status = 'fast')      > 0 THEN 'fast'
+        WHEN COUNT(*) FILTER (WHERE status = 'warming')   > 0 THEN 'warming'
+        ELSE 'normal'
+       END)                                         AS hottest_status
+    FROM tweets t
+    WHERE posted_at > NOW() - INTERVAL '48 hours'
+      AND topic IS NOT NULL
+      AND LOWER(author_handle) NOT IN (SELECT handle FROM blacklist)
+    GROUP BY topic
+    ORDER BY avg_virality DESC
+  `);
+  return rows;
+}
+
 module.exports = {
   upsertTweet,
   insertSnapshot,
@@ -403,4 +474,7 @@ module.exports = {
   getBlacklist,
   addToBlacklist,
   removeFromBlacklist,
+  getUnclassifiedTweets,
+  bulkSetTopics,
+  getTopicStats,
 };

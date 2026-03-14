@@ -46,6 +46,43 @@
     .hstat.w .hstat-val { color: var(--yellow); }
     .hstat.g .hstat-val { color: var(--green); }
 
+    /* ── Topic Radar ── */
+    .radar-panel {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+    }
+    .radar-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 10px; cursor: pointer; user-select: none;
+    }
+    .radar-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .7px; color: var(--muted2);
+    }
+    .radar-toggle { font-size: 10px; color: var(--muted); margin-left: auto; }
+    .radar-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .radar-grid.collapsed { display: none; }
+    .topic-card {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 13px;
+      min-width: 140px; max-width: 200px;
+      cursor: pointer; transition: border-color .15s, background .15s;
+    }
+    .topic-card:hover { border-color: var(--accent); background: rgba(59,130,246,.07); }
+    .topic-card.tc-parabolic { border-left: 3px solid var(--red); }
+    .topic-card.tc-fast      { border-left: 3px solid var(--orange); }
+    .topic-card.tc-warming   { border-left: 3px solid var(--yellow); }
+    .topic-card.tc-normal    { border-left: 3px solid var(--gray); }
+    .tc-name {
+      font-size: 12px; font-weight: 700; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 5px;
+    }
+    .tc-stats { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .tc-count  { font-size: 10px; color: var(--muted2); }
+    .tc-vscore { font-size: 11px; font-weight: 700; color: var(--accent); }
+    .tc-loading { color: var(--muted); font-size: 11px; font-style: italic; }
+
     /* ── Toolbar ── */
     .toolbar {
       display: flex; gap: 8px; padding: 10px 20px;
@@ -251,6 +288,18 @@
     <div class="hstat f"><div class="hstat-val" id="statFast">—</div><div class="hstat-lbl">⚡ Fast</div></div>
     <div class="hstat w"><div class="hstat-val" id="statWarming">—</div><div class="hstat-lbl">🌡 Warming</div></div>
     <div class="hstat"  ><div class="hstat-val" id="statMaxAccel">—</div><div class="hstat-lbl">Peak Accel/hr</div></div>
+  </div>
+</div>
+
+<!-- Topic Radar panel -->
+<div class="radar-panel" id="radarPanel">
+  <div class="radar-header" onclick="App.toggleRadar()">
+    <span class="radar-title">📡 Topic Radar</span>
+    <span style="font-size:10px;color:var(--muted)" id="radarSubtitle">Loading…</span>
+    <span class="radar-toggle" id="radarToggleIcon">▲ hide</span>
+  </div>
+  <div class="radar-grid" id="radarGrid">
+    <span class="tc-loading">Fetching topic data…</span>
   </div>
 </div>
 
