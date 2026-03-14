@@ -4,12 +4,13 @@ const { cleanup } = require('../db/queries');
 
 // Shared state so the API can read the last-run timestamps
 const state = {
-  lastFetch:        null,
-  lastRefresh:      null,
-  fetchRunning:     false,
-  refreshRunning:   false,
-  lastFetchError:   null,   // last error message from fetchViralTweets
-  lastFetchCount:   null,   // how many tweets were upserted on the last fetch run
+  lastFetch:              null,
+  lastRefresh:            null,
+  fetchRunning:           false,
+  refreshRunning:         false,
+  lastFetchError:         null,   // last error message from fetchViralTweets
+  lastFetchCount:         null,   // how many tweets were upserted on the last fetch run
+  consecutiveZeroFetches: 0,      // increments when fetch returns 0; resets on any result
 };
 
 // ─── Job wrappers ─────────────────────────────────────────────────────────────
@@ -26,6 +27,11 @@ async function runFetch() {
     state.lastFetch      = new Date();
     state.lastFetchCount = count;
     state.lastFetchError = null;
+    if (count > 0) {
+      state.consecutiveZeroFetches = 0;
+    } else {
+      state.consecutiveZeroFetches++;
+    }
   } catch (err) {
     console.error('[Scheduler] fetchViralTweets error:', err.message);
     state.lastFetchError = err.message;

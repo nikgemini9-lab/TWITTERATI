@@ -270,6 +270,25 @@ const App = (() => {
         footStatus.textContent = 'Updating…';
       }
 
+      // Cookie health banner
+      const ch = stats.scheduler?.cookieHealth;
+      const alertEl = document.getElementById('cookieAlert');
+      if (ch && ch.status !== 'ok' && ch.status !== 'unknown') {
+        const isDead = ch.status === 'dead';
+        alertEl.className = isDead ? 'alert-dead' : 'alert-warn';
+        alertEl.style.display = 'flex';
+        alertEl.innerHTML = `
+          <span class="alert-icon">${isDead ? '🔴' : '🟡'}</span>
+          <div class="alert-body">
+            <div class="alert-title">${isDead ? 'Cookie dead — crawler is not fetching tweets' : 'Cookie may be stale — no new tweets recently'}</div>
+            <div class="alert-reason">${esc(ch.reason)}</div>
+          </div>`;
+        if (isDead) { dot.className = 'dot err'; footStatus.textContent = 'Cookie dead'; }
+      } else {
+        alertEl.style.display = 'none';
+        alertEl.className = '';
+      }
+
       return stats;
     } catch (err) {
       document.getElementById('footDot').className = 'dot';
@@ -330,6 +349,12 @@ const App = (() => {
       rows.push(['Last fetch', '<span style="color:var(--red)">Never ran — still starting up or crashed</span>']);
     }
     if (s.lastFetchError) rows.push(['Fetch error', `<span style="color:var(--red)">${esc(s.lastFetchError)}</span>`]);
+    if (s.cookieHealth) {
+      const { status, reason } = s.cookieHealth;
+      const color = status === 'dead' ? 'var(--red)' : status === 'warn' ? 'var(--orange)' : 'var(--green)';
+      const icon  = status === 'dead' ? '🔴' : status === 'warn' ? '🟡' : '🟢';
+      rows.push(['Cookie', `<span style="color:${color}">${icon} ${esc(reason || 'OK')}</span>`]);
+    }
 
     if (stats) {
       const allTime  = parseInt(stats.total_all_time, 10) || 0;

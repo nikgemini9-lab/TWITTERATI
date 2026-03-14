@@ -210,6 +210,21 @@
     tr.row-viral:hover td { background: rgba(251,191,36,.11); }
     .badge.clickable { cursor: pointer; }
     .badge.clickable:hover { filter: brightness(1.3); }
+    #cookieAlert {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 14px; margin-bottom: 10px;
+      border-radius: 8px; font-size: 13px; line-height: 1.4;
+    }
+    #cookieAlert.alert-dead {
+      background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.35); color: #fca5a5;
+    }
+    #cookieAlert.alert-warn {
+      background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.3); color: #fde68a;
+    }
+    #cookieAlert .alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+    #cookieAlert .alert-body { flex: 1; }
+    #cookieAlert .alert-title { font-weight: 700; margin-bottom: 2px; }
+    #cookieAlert .alert-reason { font-size: 11px; opacity: .8; }
     #badgeFilterBar {
       display: flex; align-items: center; gap: 8px;
       padding: 6px 12px; margin-bottom: 4px;
@@ -358,6 +373,7 @@
     }
     .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); display: inline-block; }
     .dot.busy { background: var(--orange); animation: pulse 1s infinite; }
+    .dot.err  { background: var(--red); }
     @keyframes pulse {
       0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(249,115,22,.4); }
       50%      { opacity:.7; box-shadow: 0 0 0 5px rgba(249,115,22,0); }
@@ -444,6 +460,9 @@
     <button class="btn btn-primary" onclick="App.triggerRefresh('fetch')" style="align-self:flex-end">Fetch New</button>
   </div>
 </div>
+
+<!-- Cookie health alert (hidden by default, shown by JS when cookie is dead/stale) -->
+<div id="cookieAlert" style="display:none"></div>
 
 <!-- Tabs -->
 <div class="tabs">

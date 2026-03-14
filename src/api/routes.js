@@ -38,6 +38,28 @@ router.get('/tweets/:id/history', async (req, res) => {
 
 // ─── GET /api/stats ───────────────────────────────────────────────────────────
 
+// Derive a cookie health status from scheduler state
+function getCookieHealth() {
+  const err = state.lastFetchError || '';
+  const authFailed = /401|403|auth|unauthorized|cookie|unauthenticated|forbidden/i.test(err);
+
+  if (authFailed) {
+    return { status: 'dead', reason: `Auth error: ${err}` };
+  }
+  // 6+ consecutive zeros = ~1 hour of silence → likely dead/rate-limited
+  if (state.consecutiveZeroFetches >= 6) {
+    return { status: 'dead', reason: `No tweets returned for ${state.consecutiveZeroFetches} consecutive fetches (~${Math.round(state.consecutiveZeroFetches * 10 / 60 * 10) / 10}h)` };
+  }
+  // 3–5 consecutive zeros = ~30–50 min → warn
+  if (state.consecutiveZeroFetches >= 3) {
+    return { status: 'warn', reason: `No new tweets for ${state.consecutiveZeroFetches} consecutive fetches — cookie may be stale` };
+  }
+  if (state.lastFetch === null) {
+    return { status: 'unknown', reason: 'No fetch has run yet' };
+  }
+  return { status: 'ok', reason: null };
+}
+
 router.get('/stats', async (req, res) => {
   try {
     const stats = await getStats();
@@ -46,12 +68,14 @@ router.get('/stats', async (req, res) => {
       stats: {
         ...stats,
         scheduler: {
-          lastFetch:      state.lastFetch,
-          lastRefresh:    state.lastRefresh,
-          fetchRunning:   state.fetchRunning,
-          refreshRunning: state.refreshRunning,
-          lastFetchError: state.lastFetchError,
-          lastFetchCount: state.lastFetchCount,
+          lastFetch:              state.lastFetch,
+          lastRefresh:            state.lastRefresh,
+          fetchRunning:           state.fetchRunning,
+          refreshRunning:         state.refreshRunning,
+          lastFetchError:         state.lastFetchError,
+          lastFetchCount:         state.lastFetchCount,
+          consecutiveZeroFetches: state.consecutiveZeroFetches,
+          cookieHealth:           getCookieHealth(),
         },
       },
     });
