@@ -95,6 +95,7 @@ async function fetchViralTweets() {
   let processed = 0;
   let cursor    = undefined;
   let page      = 0;
+  const MAX_PAGES = 15; // ~300 tweets max per cycle — prevents runaway pagination
 
   do {
     let result;
@@ -121,7 +122,7 @@ async function fetchViralTweets() {
 
     // Polite delay between pages
     if (cursor) await sleep(500);
-  } while (cursor);
+  } while (cursor && page < MAX_PAGES);
 
   console.log(`[Twitter] fetchViralTweets → ${processed} tweets upserted (${page} pages)`);
   classifyNewTweets().catch(err => console.error('[AI] classifyNewTweets error:', err.message));
