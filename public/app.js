@@ -587,7 +587,7 @@ const App = (() => {
       const { config } = await apiFetch('/api/config');
       if (config.minLikes)                  document.getElementById('searchMinLikes').value    = config.minLikes;
       if (config.minRetweets !== undefined) document.getElementById('searchMinRetweets').value = config.minRetweets;
-      document.getElementById('filterMinLikes').value = config.minLikes || 12000;
+      document.getElementById('filterMinLikes').value = config.minLikes || 10000;
     } catch (_) {}
   }
 

@@ -3,7 +3,7 @@
 // without restarting the server.
 
 const config = {
-  minLikes:    parseInt(process.env.MIN_LIKES,    10) || 12000,
+  minLikes:    parseInt(process.env.MIN_LIKES,    10) || 10000,
   minRetweets: parseInt(process.env.MIN_RETWEETS, 10) || 0,
   language:    process.env.LANGUAGE || null,   // e.g. 'en' to restrict Twitter search to English
 };
