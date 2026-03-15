@@ -1,5 +1,5 @@
 const { getClient } = require('./client');
-const { upsertTweet, insertSnapshot, getTweetIdsForRefresh, recalculateGrowth, getUnclassifiedTweets, bulkSetTopics } = require('../db/queries');
+const { upsertTweet, insertSnapshot, getTweetIdsForRefresh, recalculateGrowth, getUnclassifiedTweets, bulkSetTopics, getVipWatchlist, setVipUserId } = require('../db/queries');
 const { batchClassifyTweets } = require('../ai/classifier');
 const config = require('../config');
 
@@ -179,4 +179,63 @@ async function refreshTrackedTweets() {
   return updated;
 }
 
-module.exports = { fetchViralTweets, refreshTrackedTweets };
+// ─── Poll VIP account timelines ───────────────────────────────────────────────
+//
+// For each account in the vip_watchlist, fetch the last 20 tweets directly
+// from their timeline. This bypasses the search filter entirely — no minLikes,
+// no 45-min window, no language filter. Any tweet posted since last seen is
+// upserted so it can start accumulating growth snapshots immediately.
+
+async function fetchVipTimelines() {
+  const client = getClient();
+  const vips   = await getVipWatchlist();
+  if (!vips.length) return 0;
+
+  let processed = 0;
+
+  for (const vip of vips) {
+    let userId = vip.user_id;
+
+    // Resolve handle → numeric ID on first encounter (cached in DB)
+    if (!userId) {
+      try {
+        const user = await client.user.details(vip.handle);
+        if (!user?.id) {
+          console.warn(`[VIP] Cannot resolve user ID for @${vip.handle} — skipping`);
+          await sleep(500);
+          continue;
+        }
+        userId = user.id;
+        await setVipUserId(vip.handle, userId);
+        console.log(`[VIP] Resolved @${vip.handle} → ${userId}`);
+      } catch (err) {
+        console.error(`[VIP] user.details error for @${vip.handle}:`, err.message ?? err);
+        await sleep(500);
+        continue;
+      }
+    }
+
+    try {
+      const result = await client.user.timeline(userId, 20);
+      const tweets = result?.list ?? [];
+
+      for (const tweet of tweets) {
+        if (!tweet) continue;
+        const record  = tweetToRecord(tweet);
+        const metrics = tweetToMetrics(tweet);
+        await upsertTweet(record);
+        await insertSnapshot(tweet.id, metrics);
+        processed++;
+      }
+      console.log(`[VIP] @${vip.handle}: ${tweets.length} tweets upserted`);
+    } catch (err) {
+      console.error(`[VIP] timeline error for @${vip.handle}:`, err.message ?? err);
+    }
+
+    await sleep(800);
+  }
+
+  return processed;
+}
+
+module.exports = { fetchViralTweets, refreshTrackedTweets, fetchVipTimelines };

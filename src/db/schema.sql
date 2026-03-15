@@ -60,6 +60,14 @@ CREATE TABLE IF NOT EXISTS blacklist (
   added_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- VIP watchlist — accounts whose timelines are polled every fetch cycle
+-- independently of the search filter (catches non-English, low-like, etc.)
+CREATE TABLE IF NOT EXISTS vip_watchlist (
+  handle    TEXT PRIMARY KEY,            -- lowercase, without @
+  user_id   TEXT,                        -- resolved Twitter numeric ID (cached)
+  added_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Topic classification (populated by AI classifier after each fetch cycle)
 ALTER TABLE tweets ADD COLUMN IF NOT EXISTS topic TEXT;
 CREATE INDEX IF NOT EXISTS idx_tweets_topic ON tweets(topic);

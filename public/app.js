@@ -246,6 +246,64 @@ const App = (() => {
     if (icon) icon.textContent = radarCollapsed ? '▼ show' : '▲ hide';
   }
 
+  // ─── VIP Watchlist ───────────────────────────────────────────────────────────
+
+  let vipCollapsed = true;
+
+  async function loadVip() {
+    try {
+      const { vip } = await apiFetch('/api/vip');
+      renderVipList(vip || []);
+      document.getElementById('vipSubtitle').textContent =
+        vip.length ? `${vip.length} account${vip.length !== 1 ? 's' : ''} — polled every cycle` : 'No accounts — add one below';
+    } catch (_) {}
+  }
+
+  function renderVipList(list) {
+    const el = document.getElementById('vipList');
+    if (!list.length) {
+      el.innerHTML = '<span style="font-size:11px;color:var(--muted2)">No VIP accounts yet.</span>';
+      return;
+    }
+    el.innerHTML = list.map(v => `
+      <span style="display:inline-flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border2);border-radius:20px;padding:3px 10px;font-size:12px;">
+        ⭐ @${esc(v.handle)}
+        <span onclick="App.removeVip('${esc(v.handle)}')" style="cursor:pointer;color:var(--muted2);font-size:14px;line-height:1" title="Remove">×</span>
+      </span>`).join('');
+  }
+
+  async function addVip() {
+    const input  = document.getElementById('vipInput');
+    const handle = (input.value || '').trim().replace(/^@/, '');
+    if (!handle) return;
+    try {
+      await apiFetch('/api/vip', { method: 'POST', body: JSON.stringify({ handle }) });
+      input.value = '';
+      await loadVip();
+      showToast(`@${handle} added to VIP watchlist`, 'ok');
+    } catch (err) {
+      showToast(`Error: ${err.message}`, 'err');
+    }
+  }
+
+  async function removeVip(handle) {
+    try {
+      await apiFetch(`/api/vip/${encodeURIComponent(handle)}`, { method: 'DELETE' });
+      await loadVip();
+      showToast(`@${handle} removed`, 'inf');
+    } catch (err) {
+      showToast(`Error: ${err.message}`, 'err');
+    }
+  }
+
+  function toggleVip() {
+    vipCollapsed = !vipCollapsed;
+    const grid = document.getElementById('vipGrid');
+    const icon = document.getElementById('vipToggleIcon');
+    if (grid) grid.classList.toggle('collapsed', vipCollapsed);
+    if (icon) icon.textContent = vipCollapsed ? '▼ show' : '▲ hide';
+  }
+
   // ─── Stats header ─────────────────────────────────────────────────────────────
 
   async function loadStats() {
@@ -813,6 +871,7 @@ const App = (() => {
     load();
     loadStats();
     loadTopics();
+    loadVip();
     loadConfig();
     loadBlacklist();
     loadMemeHistory();
@@ -820,10 +879,11 @@ const App = (() => {
     ['filterAuthor', 'filterMinLikes'].forEach(id => {
       document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') load(); });
     });
+    document.getElementById('vipInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') addVip(); });
     document.getElementById('blacklistInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') addBlacklistFromInput(); });
   }
 
   document.addEventListener('DOMContentLoaded', init);
 
-  return { load, setTab, setStatusTab, setSortAndLoad, setBadgeFilter, clearBadgeFilter, triggerRefresh, openChart, closeModal, applySearchThreshold, toggleEnglish, blockHandle, unblockHandle, openBlacklist, closeBlacklist, addBlacklistFromInput, filterByTopic, toggleRadar, showPreview, startHidePreview, cancelHidePreview, hidePreview, toggleMeme };
+  return { load, setTab, setStatusTab, setSortAndLoad, setBadgeFilter, clearBadgeFilter, triggerRefresh, openChart, closeModal, applySearchThreshold, toggleEnglish, blockHandle, unblockHandle, openBlacklist, closeBlacklist, addBlacklistFromInput, filterByTopic, toggleRadar, showPreview, startHidePreview, cancelHidePreview, hidePreview, toggleMeme, toggleVip, addVip, removeVip };
 })();

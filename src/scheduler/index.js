@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const { fetchViralTweets, refreshTrackedTweets } = require('../twitter/search');
+const { fetchViralTweets, refreshTrackedTweets, fetchVipTimelines } = require('../twitter/search');
 const { cleanup } = require('../db/queries');
 
 // Shared state so the API can read the last-run timestamps
@@ -38,6 +38,9 @@ async function runFetch() {
   } finally {
     state.fetchRunning = false;
   }
+
+  // VIP timelines run right after the main fetch (fire-and-forget, errors logged internally)
+  fetchVipTimelines().catch(err => console.error('[Scheduler] fetchVipTimelines error:', err.message));
 }
 
 async function runRefresh() {

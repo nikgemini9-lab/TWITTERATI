@@ -518,4 +518,31 @@ module.exports = {
   getMemeHistory,
   addToMemeHistory,
   removeFromMemeHistory,
+  // VIP watchlist
+  getVipWatchlist,
+  addToVipWatchlist,
+  removeFromVipWatchlist,
+  setVipUserId,
 };
+
+// ─── VIP Watchlist CRUD ───────────────────────────────────────────────────────
+
+async function getVipWatchlist() {
+  const { rows } = await db.query(`SELECT handle, user_id, added_at FROM vip_watchlist ORDER BY added_at DESC`);
+  return rows;
+}
+
+async function addToVipWatchlist(handle) {
+  const h = handle.replace(/^@/, '').toLowerCase().trim();
+  await db.query(`INSERT INTO vip_watchlist (handle) VALUES ($1) ON CONFLICT DO NOTHING`, [h]);
+}
+
+async function removeFromVipWatchlist(handle) {
+  const h = handle.replace(/^@/, '').toLowerCase().trim();
+  await db.query(`DELETE FROM vip_watchlist WHERE handle = $1`, [h]);
+}
+
+async function setVipUserId(handle, userId) {
+  const h = handle.replace(/^@/, '').toLowerCase().trim();
+  await db.query(`UPDATE vip_watchlist SET user_id = $1 WHERE handle = $2`, [userId, h]);
+}

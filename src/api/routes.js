@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { getTweets, getTweetHistory, getStats, getBlacklist, addToBlacklist, removeFromBlacklist, getTopicStats, getMemeHistory, addToMemeHistory, removeFromMemeHistory } = require('../db/queries');
+const { getTweets, getTweetHistory, getStats, getBlacklist, addToBlacklist, removeFromBlacklist, getTopicStats, getMemeHistory, addToMemeHistory, removeFromMemeHistory, getVipWatchlist, addToVipWatchlist, removeFromVipWatchlist } = require('../db/queries');
 const { runFetch, runRefresh, state } = require('../scheduler');
 const config = require('../config');
 
@@ -219,6 +219,37 @@ router.delete('/meme-history/:id', async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error('[API] DELETE /meme-history:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── VIP Watchlist endpoints ──────────────────────────────────────────────────
+
+router.get('/vip', async (req, res) => {
+  try {
+    const list = await getVipWatchlist();
+    res.json({ ok: true, vip: list });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+router.post('/vip', async (req, res) => {
+  const handle = (req.body?.handle || '').trim();
+  if (!handle) return res.status(400).json({ ok: false, error: 'handle required' });
+  try {
+    await addToVipWatchlist(handle);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+router.delete('/vip/:handle', async (req, res) => {
+  try {
+    await removeFromVipWatchlist(req.params.handle);
+    res.json({ ok: true });
+  } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
 });

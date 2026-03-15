@@ -394,6 +394,22 @@
   </div>
 </div>
 
+<!-- VIP Watchlist panel -->
+<div class="radar-panel" id="vipPanel">
+  <div class="radar-header" onclick="App.toggleVip()">
+    <span class="radar-title">⭐ VIP Watchlist</span>
+    <span style="font-size:10px;color:var(--muted)" id="vipSubtitle">Accounts polled every cycle regardless of like threshold</span>
+    <span class="radar-toggle" id="vipToggleIcon">▼ show</span>
+  </div>
+  <div class="radar-grid collapsed" id="vipGrid">
+    <div id="vipList" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;width:100%"></div>
+    <div style="display:flex;gap:6px;margin-top:8px;width:100%">
+      <input id="vipInput" type="text" placeholder="@handle" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;">
+      <button onclick="App.addVip()" style="background:var(--accent);border:none;border-radius:6px;padding:5px 14px;color:#000;font-size:12px;font-weight:700;cursor:pointer">Add</button>
+    </div>
+  </div>
+</div>
+
 <!-- Topic Radar panel -->
 <div class="radar-panel" id="radarPanel">
   <div class="radar-header" onclick="App.toggleRadar()">
