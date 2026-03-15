@@ -72,14 +72,15 @@ function tweetToMetrics(tweet) {
 async function fetchViralTweets() {
   const client = getClient();
 
-  // Anchor the search to the last 4 hours.
+  // Anchor the search to the last 12 hours.
   //
-  // A tweet that takes 50-90 minutes to accumulate enough likes to cross the
-  // min_faves threshold would be permanently missed with a short window —
-  // it becomes eligible exactly when it ages out. 4 hours ensures any tweet
-  // that goes viral within that window is always caught. upsertTweet uses
-  // ON CONFLICT DO UPDATE so fetching the same tweet multiple times is fine.
-  const startDate = new Date(Date.now() - 4 * 60 * 60 * 1000);
+  // Tweets that go viral slowly (or are posted in off-peak hours and picked up
+  // later) can take many hours to accumulate enough likes to cross the
+  // min_faves threshold. A 4-hour window still misses tweets that crossed the
+  // threshold at hour 4.5. 12 hours provides a large enough safety net while
+  // keeping the result set manageable. upsertTweet ON CONFLICT handles
+  // duplicates across cycles gracefully.
+  const startDate = new Date(Date.now() - 12 * 60 * 60 * 1000);
 
   const filter = {
     minLikes:    config.minLikes,
@@ -176,6 +177,59 @@ async function refreshTrackedTweets() {
   return updated;
 }
 
+// ─── Deep backfill pass ───────────────────────────────────────────────────────
+//
+// Runs once daily. Looks back 48 hours to catch any viral tweet that:
+//  - crossed the like threshold slowly (after the 12h window had moved on)
+//  - was missed due to API gaps or transient rate limiting
+// Uses a higher like threshold to keep the result set small.
+
+async function deepBackfill() {
+  const client    = getClient();
+  const startDate = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  const minLikes  = Math.max(config.minLikes, 30000); // higher bar to limit results
+
+  const filter = {
+    minLikes,
+    onlyOriginal: true,
+    startDate,
+  };
+
+  console.log(`[Twitter] deepBackfill: min_faves:${minLikes} since:${startDate.toISOString()}`);
+
+  let processed = 0;
+  let cursor    = undefined;
+  let page      = 0;
+
+  do {
+    let result;
+    try {
+      result = await client.tweet.search(filter, 20, cursor);
+    } catch (err) {
+      console.error(`[Twitter] deepBackfill search error (page ${page}):`, err.message ?? err);
+      break;
+    }
+
+    const tweets = result?.list ?? [];
+    if (!tweets.length) break;
+
+    for (const tweet of tweets) {
+      const record  = tweetToRecord(tweet);
+      const metrics = tweetToMetrics(tweet);
+      await upsertTweet(record);
+      await insertSnapshot(tweet.id, metrics);
+      processed++;
+    }
+
+    cursor = result?.next?.value;
+    page++;
+    if (cursor) await sleep(500);
+  } while (cursor);
+
+  console.log(`[Twitter] deepBackfill → ${processed} tweets upserted (${page} pages)`);
+  return processed;
+}
+
 // ─── Poll VIP account timelines ───────────────────────────────────────────────
 //
 // For each account in the vip_watchlist, fetch the last 20 tweets directly
@@ -235,4 +289,4 @@ async function fetchVipTimelines() {
   return processed;
 }
 
-module.exports = { fetchViralTweets, refreshTrackedTweets, fetchVipTimelines };
+module.exports = { fetchViralTweets, refreshTrackedTweets, fetchVipTimelines, deepBackfill };

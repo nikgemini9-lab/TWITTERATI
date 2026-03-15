@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const { fetchViralTweets, refreshTrackedTweets, fetchVipTimelines } = require('../twitter/search');
+const { fetchViralTweets, refreshTrackedTweets, fetchVipTimelines, deepBackfill } = require('../twitter/search');
 const { cleanup } = require('../db/queries');
 
 // Shared state so the API can read the last-run timestamps
@@ -69,6 +69,16 @@ async function runCleanup() {
   }
 }
 
+async function runDeepBackfill() {
+  try {
+    console.log('[Scheduler] Starting deepBackfill …');
+    const count = await deepBackfill();
+    console.log(`[Scheduler] deepBackfill complete — ${count} tweets upserted`);
+  } catch (err) {
+    console.error('[Scheduler] deepBackfill error:', err.message);
+  }
+}
+
 // ─── Start scheduler ──────────────────────────────────────────────────────────
 
 function start() {
@@ -81,7 +91,10 @@ function start() {
   // Daily cleanup at 03:00
   cron.schedule('0 3 * * *', runCleanup);
 
-  console.log('[Scheduler] Jobs scheduled: fetch=10min, refresh=10min(offset 5min), cleanup=daily 03:00');
+  // Daily deep backfill at 02:00 — 48h lookback at 30K+ threshold to catch anything missed
+  cron.schedule('0 2 * * *', runDeepBackfill);
+
+  console.log('[Scheduler] Jobs scheduled: fetch=10min, refresh=10min(offset 5min), backfill=daily 02:00, cleanup=daily 03:00');
 
   // Run fetch immediately on startup so data is available right away
   setImmediate(runFetch);
