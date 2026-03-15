@@ -72,17 +72,14 @@ function tweetToMetrics(tweet) {
 async function fetchViralTweets() {
   const client = getClient();
 
-  // Anchor the search to the last 45 minutes.
+  // Anchor the search to the last 4 hours.
   //
-  // Without startDate, Twitter returns results in RELEVANCE order (not newest
-  // first), which buries small accounts behind large verified ones even when
-  // their tweet passes the min_faves threshold.
-  //
-  // With startDate, Twitter returns results newest-first within that window.
-  // We use 45 min (4.5× the 10-min cron interval) so "slow burner" tweets
-  // — posted 20-40 min ago and only now crossing the like threshold — are
-  // always caught. upsertTweet handles duplicates gracefully.
-  const startDate = new Date(Date.now() - 45 * 60 * 1000);
+  // A tweet that takes 50-90 minutes to accumulate enough likes to cross the
+  // min_faves threshold would be permanently missed with a short window —
+  // it becomes eligible exactly when it ages out. 4 hours ensures any tweet
+  // that goes viral within that window is always caught. upsertTweet uses
+  // ON CONFLICT DO UPDATE so fetching the same tweet multiple times is fine.
+  const startDate = new Date(Date.now() - 4 * 60 * 60 * 1000);
 
   const filter = {
     minLikes:    config.minLikes,
