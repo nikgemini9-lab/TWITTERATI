@@ -64,45 +64,19 @@ function tweetToMetrics(tweet) {
   };
 }
 
-// ─── Fetch new viral tweets via search ───────────────────────────────────────
-//
-// Equivalent to: min_faves:X -filter:replies [min_retweets:Y]
-// No date/keyword filters — keep it identical to what works manually.
+// ─── Shared search helper ─────────────────────────────────────────────────────
 
-async function fetchViralTweets() {
-  const client = getClient();
-
-  // Anchor the search to the last 12 hours.
-  //
-  // Tweets that go viral slowly (or are posted in off-peak hours and picked up
-  // later) can take many hours to accumulate enough likes to cross the
-  // min_faves threshold. A 4-hour window still misses tweets that crossed the
-  // threshold at hour 4.5. 12 hours provides a large enough safety net while
-  // keeping the result set manageable. upsertTweet ON CONFLICT handles
-  // duplicates across cycles gracefully.
-  const startDate = new Date(Date.now() - 12 * 60 * 60 * 1000);
-
-  const filter = {
-    minLikes:    config.minLikes,
-    onlyOriginal: true,                                           // -filter:replies
-    startDate,
-    ...(config.minRetweets > 0 && { minRetweets: config.minRetweets }),
-    // No language filter — catch all languages, user filters on dashboard
-  };
-
-  console.log(`[Twitter] search filter: min_faves:${config.minLikes}${config.minRetweets > 0 ? ` min_retweets:${config.minRetweets}` : ''} since:${startDate.toISOString()} -filter:replies (all languages)`);
-
+async function runSearch(client, filter, maxPages, label) {
   let processed = 0;
   let cursor    = undefined;
   let page      = 0;
-  const MAX_PAGES = 15; // ~300 tweets max per cycle — prevents runaway pagination
 
   do {
     let result;
     try {
       result = await client.tweet.search(filter, 20, cursor);
     } catch (err) {
-      console.error(`[Twitter] search error (page ${page}):`, err.message ?? err);
+      console.error(`[Twitter] ${label} search error (page ${page}):`, err.message ?? err);
       break;
     }
 
@@ -110,23 +84,68 @@ async function fetchViralTweets() {
     if (!tweets.length) break;
 
     for (const tweet of tweets) {
-      const record  = tweetToRecord(tweet);
-      const metrics = tweetToMetrics(tweet);
-      await upsertTweet(record);
-      await insertSnapshot(tweet.id, metrics);
+      await upsertTweet(tweetToRecord(tweet));
+      await insertSnapshot(tweet.id, tweetToMetrics(tweet));
       processed++;
     }
 
     cursor = result?.next?.value;
     page++;
-
-    // Polite delay between pages
     if (cursor) await sleep(500);
-  } while (cursor && page < MAX_PAGES);
+  } while (cursor && (maxPages === 0 || page < maxPages));
 
-  console.log(`[Twitter] fetchViralTweets → ${processed} tweets upserted (${page} pages)`);
-  classifyNewTweets().catch(err => console.error('[AI] classifyNewTweets error:', err.message));
+  console.log(`[Twitter] ${label} → ${processed} tweets upserted (${page} pages)`);
   return processed;
+}
+
+// ─── Fetch new viral tweets via search ───────────────────────────────────────
+//
+// Two-pass strategy to avoid the pagination-depth problem:
+//
+//  Pass 1 — RECENT (every 10 min):  last 90 min, minLikes threshold, ≤5 pages
+//    → catches newly-breaking tweets fast with minimal API cost
+//
+//  Pass 2 — BACKFILL (every 60 min, called separately): last 12 h, 2× threshold
+//    → catches slow-rising tweets that crossed the threshold hours after posting
+//    → higher threshold keeps result count small so no page cap needed
+
+async function fetchViralTweets() {
+  const client    = getClient();
+  const startDate = new Date(Date.now() - 90 * 60 * 1000); // 90-minute recent window
+
+  const filter = {
+    minLikes:     config.minLikes,
+    onlyOriginal: true,
+    startDate,
+    ...(config.minRetweets > 0 && { minRetweets: config.minRetweets }),
+  };
+
+  console.log(`[Twitter] recent fetch: min_faves:${config.minLikes} since:${startDate.toISOString()}`);
+  const count = await runSearch(client, filter, 5, 'recent');
+  classifyNewTweets().catch(err => console.error('[AI] classifyNewTweets error:', err.message));
+  return count;
+}
+
+// ─── Hourly backfill ──────────────────────────────────────────────────────────
+//
+// Searches the last 12 hours at 2× the normal threshold.
+// The higher bar means far fewer results so pagination depth is manageable
+// without a page cap. Catches tweets like @Global_Folder that crossed the
+// threshold hours after posting and fell off the short recent window.
+
+async function hourlyBackfill() {
+  const client    = getClient();
+  const startDate = new Date(Date.now() - 12 * 60 * 60 * 1000);
+  const minLikes  = config.minLikes * 2; // higher bar keeps result count small
+
+  const filter = {
+    minLikes,
+    onlyOriginal: true,
+    startDate,
+  };
+
+  console.log(`[Twitter] hourly backfill: min_faves:${minLikes} since:${startDate.toISOString()}`);
+  return runSearch(client, filter, 0, 'hourly-backfill'); // 0 = no page cap
 }
 
 // ─── Refresh metrics for already-tracked tweets ───────────────────────────────
@@ -290,4 +309,4 @@ async function fetchVipTimelines() {
   return processed;
 }
 
-module.exports = { fetchViralTweets, refreshTrackedTweets, fetchVipTimelines, deepBackfill };
+module.exports = { fetchViralTweets, hourlyBackfill, refreshTrackedTweets, fetchVipTimelines, deepBackfill };
