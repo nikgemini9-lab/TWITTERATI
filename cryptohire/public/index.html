@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CryptoHire — Web3 Job Radar</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #060a0f;
+      --surface:  #0d1117;
+      --surface2: #131a23;
+      --surface3: #1a2230;
+      --border:   #1e2d3d;
+      --border2:  #2a3f55;
+      --text:     #e2e8f0;
+      --muted:    #5a7a9a;
+      --muted2:   #7a9ab8;
+      --accent:   #00d4aa;  /* teal/green — crypto vibes */
+      --accent2:  #0099ff;
+      --purple:   #9b59f5;
+      --orange:   #f97316;
+      --red:      #ef4444;
+      --yellow:   #eab308;
+      --green:    #22c55e;
+      --gray:     #374151;
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px; min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 14px 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    }
+    .logo { display: flex; align-items: center; gap: 8px; }
+    .logo-icon { font-size: 22px; }
+    .logo-text { font-size: 18px; font-weight: 900; letter-spacing: -0.5px; }
+    .logo-text span { color: var(--accent); }
+    .header-stats { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; align-items: center; }
+    .hstat {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 5px 12px; text-align: center; min-width: 64px;
+    }
+    .hstat-val { font-size: 16px; font-weight: 800; line-height: 1; color: var(--accent); }
+    .hstat-lbl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; margin-top: 2px; }
+    .cookie-dot {
+      width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+      margin-right: 6px; background: var(--muted);
+    }
+    .cookie-dot.ok     { background: var(--green); }
+    .cookie-dot.warn   { background: var(--yellow); }
+    .cookie-dot.dead   { background: var(--red); }
+
+    /* ── Subspace bar ── */
+    .subspace-bar {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 10px 20px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+    }
+    .subspace-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; margin-right: 4px; }
+    .tag-btn {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--muted2); border-radius: 20px; padding: 4px 10px;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      transition: all .15s; white-space: nowrap;
+    }
+    .tag-btn:hover  { border-color: var(--accent); color: var(--accent); }
+    .tag-btn.active { background: rgba(0,212,170,.12); border-color: var(--accent); color: var(--accent); }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex; gap: 8px; padding: 10px 20px;
+      border-bottom: 1px solid var(--border); background: var(--surface);
+      flex-wrap: wrap; align-items: flex-end;
+      position: sticky; top: 0; z-index: 50;
+    }
+    .tg { display: flex; flex-direction: column; gap: 3px; }
+    .tl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; font-weight: 600; }
+    select, input[type="text"] {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 6px; padding: 5px 8px;
+      font-size: 12px; outline: none; transition: border-color .15s; height: 30px;
+    }
+    select:focus, input:focus { border-color: var(--accent); }
+    .search-input { width: 200px; }
+    .btn {
+      height: 30px; padding: 0 14px; border-radius: 6px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--border); transition: all .15s;
+      background: var(--surface2); color: var(--muted2);
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.primary { background: var(--accent); color: #000; border-color: var(--accent); }
+    .btn.primary:hover { opacity: .85; }
+    .result-count { font-size: 11px; color: var(--muted); align-self: center; margin-left: auto; }
+
+    /* ── Main layout ── */
+    .main { display: flex; gap: 0; min-height: calc(100vh - 170px); }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 240px; flex-shrink: 0; border-right: 1px solid var(--border);
+      background: var(--surface); padding: 16px; overflow-y: auto;
+    }
+    .sidebar-section { margin-bottom: 20px; }
+    .sidebar-title {
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .8px; color: var(--muted); margin-bottom: 8px;
+    }
+    .filter-opt {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 5px 8px; border-radius: 6px; cursor: pointer;
+      transition: background .1s; color: var(--muted2); font-size: 12px;
+    }
+    .filter-opt:hover { background: var(--surface2); }
+    .filter-opt.active { background: rgba(0,212,170,.1); color: var(--accent); }
+    .filter-opt .badge {
+      background: var(--surface3); border-radius: 10px;
+      padding: 1px 7px; font-size: 10px; color: var(--muted); font-weight: 700;
+    }
+    .filter-opt.active .badge { background: rgba(0,212,170,.2); color: var(--accent); }
+
+    /* ── Job cards grid ── */
+    .jobs-area { flex: 1; padding: 16px; overflow-y: auto; }
+    .jobs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+
+    .job-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px 16px;
+      display: flex; flex-direction: column; gap: 10px;
+      transition: border-color .15s, box-shadow .15s;
+      position: relative; overflow: hidden;
+    }
+    .job-card:hover { border-color: var(--border2); box-shadow: 0 0 0 1px var(--border2); }
+    .job-card.new-card { border-left: 3px solid var(--accent); }
+
+    /* subspace color strip */
+    .job-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    }
+    .job-card[data-subspace="prediction_markets"]::before { background: var(--purple); }
+    .job-card[data-subspace="defi"]::before              { background: var(--accent); }
+    .job-card[data-subspace="trading"]::before           { background: var(--orange); }
+    .job-card[data-subspace="nft"]::before               { background: var(--yellow); }
+    .job-card[data-subspace="infrastructure"]::before    { background: var(--accent2); }
+    .job-card[data-subspace="general_web3"]::before      { background: var(--green); }
+
+    /* Author row */
+    .job-author { display: flex; align-items: flex-start; gap: 10px; }
+    .author-avatar {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--surface3); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; color: var(--accent);
+      flex-shrink: 0; text-transform: uppercase;
+    }
+    .author-info { flex: 1; min-width: 0; }
+    .author-name { font-size: 13px; font-weight: 700; }
+    .author-handle { font-size: 11px; color: var(--muted2); }
+    .author-bio {
+      font-size: 11px; color: var(--muted); margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .verified-badge { color: var(--accent2); font-size: 12px; margin-left: 3px; }
+
+    /* Tags row */
+    .job-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+    .chip {
+      font-size: 10px; font-weight: 700; padding: 2px 8px;
+      border-radius: 20px; border: 1px solid; text-transform: capitalize;
+    }
+    .chip-subspace-prediction_markets { color: var(--purple);  border-color: rgba(155,89,245,.3); background: rgba(155,89,245,.08); }
+    .chip-subspace-defi               { color: var(--accent);  border-color: rgba(0,212,170,.3);  background: rgba(0,212,170,.08); }
+    .chip-subspace-trading            { color: var(--orange);  border-color: rgba(249,115,22,.3); background: rgba(249,115,22,.08); }
+    .chip-subspace-nft                { color: var(--yellow);  border-color: rgba(234,179,8,.3);  background: rgba(234,179,8,.08); }
+    .chip-subspace-infrastructure     { color: var(--accent2); border-color: rgba(0,153,255,.3);  background: rgba(0,153,255,.08); }
+    .chip-subspace-general_web3       { color: var(--green);   border-color: rgba(34,197,94,.3);  background: rgba(34,197,94,.08); }
+    .chip-subspace-other              { color: var(--muted2);  border-color: var(--border);        background: var(--surface2); }
+    .chip-role  { color: var(--muted2); border-color: var(--border); background: var(--surface2); }
+    .chip-remote-true  { color: var(--green);  border-color: rgba(34,197,94,.3); background: rgba(34,197,94,.06); }
+    .chip-remote-false { color: var(--muted);  border-color: var(--border);      background: var(--surface2); }
+    .chip-seniority { color: var(--muted2); border-color: var(--border); background: var(--surface2); }
+
+    /* Tweet text */
+    .job-text {
+      font-size: 12px; line-height: 1.5; color: var(--text);
+      white-space: pre-wrap; word-break: break-word;
+      max-height: 100px; overflow: hidden; position: relative;
+    }
+    .job-text.expanded { max-height: none; }
+    .expand-btn {
+      font-size: 10px; color: var(--accent); cursor: pointer;
+      margin-top: 2px; display: none; background: none; border: none; padding: 0;
+    }
+
+    /* AI summary */
+    .job-summary {
+      font-size: 11px; color: var(--muted2); font-style: italic;
+      background: var(--surface2); border-radius: 6px; padding: 6px 9px;
+      border-left: 2px solid var(--accent);
+    }
+
+    /* Footer row */
+    .job-footer { display: flex; align-items: center; gap: 8px; }
+    .job-meta { font-size: 10px; color: var(--muted); display: flex; gap: 10px; flex: 1; }
+    .job-meta span { display: flex; align-items: center; gap: 3px; }
+    .job-actions { display: flex; gap: 6px; }
+    .action-btn {
+      font-size: 10px; font-weight: 600; padding: 4px 10px; border-radius: 6px;
+      cursor: pointer; border: 1px solid; transition: all .15s; text-decoration: none;
+      display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+    }
+    .action-btn.dm    { color: var(--accent);  border-color: rgba(0,212,170,.4); background: rgba(0,212,170,.07); }
+    .action-btn.dm:hover { background: rgba(0,212,170,.15); }
+    .action-btn.view  { color: var(--muted2); border-color: var(--border); background: var(--surface2); }
+    .action-btn.view:hover { border-color: var(--border2); }
+    .action-btn.archive { color: var(--muted); border-color: var(--border); background: transparent; }
+    .action-btn.archive:hover { color: var(--red); border-color: rgba(239,68,68,.4); }
+    .action-btn.filled { color: var(--green); border-color: rgba(34,197,94,.4); background: rgba(34,197,94,.07); }
+    .action-btn.filled:hover { background: rgba(34,197,94,.15); }
+
+    /* Confidence bar */
+    .confidence-bar {
+      height: 2px; background: var(--border); border-radius: 1px; margin-top: 4px;
+    }
+    .confidence-fill { height: 100%; border-radius: 1px; background: var(--accent); }
+
+    /* Empty / loading */
+    .empty {
+      text-align: center; padding: 60px 20px; color: var(--muted);
+      grid-column: 1 / -1;
+    }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty h3 { font-size: 16px; color: var(--muted2); margin-bottom: 6px; }
+    .loading-spinner {
+      width: 24px; height: 24px; border: 2px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin .7s linear infinite; margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* VIP modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.7); z-index: 200; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 24px; width: 420px; max-height: 80vh;
+      overflow-y: auto; display: flex; flex-direction: column; gap: 14px;
+    }
+    .modal h3 { font-size: 15px; font-weight: 700; }
+    .modal-input-row { display: flex; gap: 8px; }
+    .modal-input-row input { flex: 1; height: 34px; }
+    .vip-list { display: flex; flex-direction: column; gap: 6px; }
+    .vip-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 10px; background: var(--surface2); border-radius: 8px;
+      border: 1px solid var(--border); font-size: 12px;
+    }
+    .vip-remove { color: var(--red); cursor: pointer; font-size: 16px; line-height: 1; background: none; border: none; }
+    .modal-close {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      font-size: 20px; line-height: 1; margin-left: auto;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 20px; right: 20px;
+      background: var(--surface); border: 1px solid var(--accent);
+      color: var(--accent); padding: 10px 16px; border-radius: 8px;
+      font-size: 12px; font-weight: 600; z-index: 300;
+      opacity: 0; transition: opacity .2s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .jobs-grid { grid-template-columns: 1fr; }
+      .search-input { width: 130px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ───────────────────────────────────────────────────────────────── -->
+<header class="header">
+  <div class="logo">
+    <span class="logo-icon">⛓</span>
+    <span class="logo-text">Crypto<span>Hire</span></span>
+  </div>
+  <div id="cookieStatus" style="font-size:11px;color:var(--muted);display:flex;align-items:center;">
+    <span class="cookie-dot" id="cookieDot"></span><span id="cookieText">loading…</span>
+  </div>
+  <div class="header-stats">
+    <div class="hstat"><div class="hstat-val" id="statActive">—</div><div class="hstat-lbl">Active</div></div>
+    <div class="hstat"><div class="hstat-val" id="stat24h">—</div><div class="hstat-lbl">Last 24h</div></div>
+    <div class="hstat"><div class="hstat-val" id="stat7d">—</div><div class="hstat-lbl">Last 7d</div></div>
+    <div class="hstat"><div class="hstat-val" id="statRemote">—</div><div class="hstat-lbl">Remote</div></div>
+    <button class="btn" onclick="openVipModal()">⭐ VIPs</button>
+    <button class="btn primary" onclick="triggerFetch()" id="fetchBtn">↻ Fetch</button>
+  </div>
+</header>
+
+<!-- ── Subspace quick-filter bar ────────────────────────────────────────────── -->
+<div class="subspace-bar">
+  <span class="subspace-label">Subspace</span>
+  <button class="tag-btn active" data-subspace="all" onclick="setSubspace('all', this)">All</button>
+  <button class="tag-btn" data-subspace="prediction_markets" onclick="setSubspace('prediction_markets', this)">📊 Prediction Markets</button>
+  <button class="tag-btn" data-subspace="defi"               onclick="setSubspace('defi', this)">🌊 DeFi</button>
+  <button class="tag-btn" data-subspace="trading"            onclick="setSubspace('trading', this)">📈 Trading</button>
+  <button class="tag-btn" data-subspace="infrastructure"     onclick="setSubspace('infrastructure', this)">🔧 Infrastructure</button>
+  <button class="tag-btn" data-subspace="nft"                onclick="setSubspace('nft', this)">🎨 NFT</button>
+  <button class="tag-btn" data-subspace="general_web3"       onclick="setSubspace('general_web3', this)">🌐 Web3</button>
+  <button class="tag-btn" data-subspace="other"              onclick="setSubspace('other', this)">Other</button>
+</div>
+
+<!-- ── Toolbar ──────────────────────────────────────────────────────────────── -->
+<div class="toolbar">
+  <div class="tg">
+    <span class="tl">Role</span>
+    <select id="filterRole" onchange="applyFilters()">
+      <option value="all">All roles</option>
+      <option value="engineer">Engineer</option>
+      <option value="researcher">Researcher</option>
+      <option value="trader">Trader</option>
+      <option value="analyst">Analyst</option>
+      <option value="marketing">Marketing</option>
+      <option value="ops">Operations</option>
+      <option value="design">Design</option>
+      <option value="bd">BD</option>
+      <option value="content">Content</option>
+      <option value="other">Other</option>
+    </select>
+  </div>
+  <div class="tg">
+    <span class="tl">Remote</span>
+    <select id="filterRemote" onchange="applyFilters()">
+      <option value="">Any</option>
+      <option value="true">Remote ✓</option>
+      <option value="false">On-site</option>
+    </select>
+  </div>
+  <div class="tg">
+    <span class="tl">Seniority</span>
+    <select id="filterSeniority" onchange="applyFilters()">
+      <option value="all">All levels</option>
+      <option value="junior">Junior</option>
+      <option value="mid">Mid</option>
+      <option value="senior">Senior</option>
+      <option value="lead">Lead</option>
+      <option value="any">Any</option>
+    </select>
+  </div>
+  <div class="tg">
+    <span class="tl">Sort</span>
+    <select id="filterSort" onchange="applyFilters()">
+      <option value="newest">Newest first</option>
+      <option value="likes">Most liked</option>
+      <option value="earliest">Oldest first</option>
+    </select>
+  </div>
+  <div class="tg">
+    <span class="tl">Search</span>
+    <input type="text" class="search-input" id="filterSearch" placeholder="keyword, @handle…" oninput="debounceSearch()" />
+  </div>
+  <div class="tg">
+    <span class="tl">Show</span>
+    <select id="filterFilled" onchange="applyFilters()">
+      <option value="false">Open only</option>
+      <option value="true">Filled</option>
+    </select>
+  </div>
+  <span class="result-count" id="resultCount"></span>
+</div>
+
+<!-- ── Main ─────────────────────────────────────────────────────────────────── -->
+<div class="main">
+
+  <!-- Sidebar role/subspace breakdown -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">By Role</div>
+      <div id="sidebarRoles"></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">By Subspace</div>
+      <div id="sidebarSubspaces"></div>
+    </div>
+  </aside>
+
+  <!-- Job cards -->
+  <div class="jobs-area">
+    <div class="jobs-grid" id="jobsGrid">
+      <div class="empty">
+        <div class="loading-spinner"></div>
+        <h3>Loading jobs…</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── VIP Modal ─────────────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="vipModal" onclick="closeVipModal(event)">
+  <div class="modal">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <h3>⭐ VIP Watchlist</h3>
+      <button class="modal-close" onclick="closeVipModal()">×</button>
+    </div>
+    <p style="font-size:11px;color:var(--muted);line-height:1.5;">
+      Accounts whose timelines are polled every cycle — bypasses the minLikes threshold.
+      Add known crypto firms, founders, or recruiters.
+    </p>
+    <div class="modal-input-row">
+      <input type="text" id="vipInput" placeholder="@handle or handle" onkeydown="if(event.key==='Enter')addVip()" />
+      <button class="btn primary" onclick="addVip()">Add</button>
+    </div>
+    <div class="vip-list" id="vipList">
+      <span style="color:var(--muted);font-size:11px;">Loading…</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ─────────────────────────────────────────────────────────────────── -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── State ─────────────────────────────────────────────────────────────────────
+let allJobs       = [];
+let activeSubspace = 'all';
+let searchTimer    = null;
+
+// ─── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadStats();
+  loadJobs();
+  setInterval(loadStats, 30000);
+  setInterval(loadJobs,  60000);
+});
+
+// ─── Data loading ───────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const d = await r.json();
+    if (!d.ok) return;
+
+    document.getElementById('statActive').textContent  = fmt(d.stats.active);
+    document.getElementById('stat24h').textContent     = fmt(d.stats.last_24h);
+    document.getElementById('stat7d').textContent      = fmt(d.stats.last_7d);
+    document.getElementById('statRemote').textContent  = fmt(d.stats.remote);
+
+    // Cookie health
+    const health = d.stats.scheduler?.cookieHealth || {};
+    const dot    = document.getElementById('cookieDot');
+    const txt    = document.getElementById('cookieText');
+    dot.className = `cookie-dot ${health.status || ''}`;
+    txt.textContent = health.status === 'ok'
+      ? `Last fetch: ${timeAgo(d.stats.scheduler.lastFetch)}`
+      : (health.reason || health.status || '');
+
+    // Sidebar
+    renderSidebar(d.roles || [], d.subspaces || []);
+  } catch (e) { console.error('loadStats:', e); }
+}
+
+async function loadJobs() {
+  const params = buildParams();
+  try {
+    const r = await fetch('/api/jobs?' + params);
+    const d = await r.json();
+    if (!d.ok) return;
+    allJobs = d.jobs;
+    renderJobs(allJobs);
+  } catch (e) {
+    console.error('loadJobs:', e);
+    document.getElementById('jobsGrid').innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><h3>Failed to load</h3></div>';
+  }
+}
+
+function buildParams() {
+  const p = new URLSearchParams();
+  const role      = document.getElementById('filterRole').value;
+  const remote    = document.getElementById('filterRemote').value;
+  const seniority = document.getElementById('filterSeniority').value;
+  const sort      = document.getElementById('filterSort').value;
+  const search    = document.getElementById('filterSearch').value.trim();
+  const filled    = document.getElementById('filterFilled').value;
+
+  if (role !== 'all')        p.set('role_type',  role);
+  if (activeSubspace !== 'all') p.set('subspace', activeSubspace);
+  if (remote)                p.set('remote',     remote);
+  if (seniority !== 'all')   p.set('seniority',  seniority);
+  if (sort)                  p.set('sort',        sort);
+  if (search)                p.set('search',      search);
+  p.set('is_filled', filled);
+  p.set('limit', '500');
+  return p.toString();
+}
+
+// ─── Render ─────────────────────────────────────────────────────────────────────
+function renderJobs(jobs) {
+  const grid = document.getElementById('jobsGrid');
+  document.getElementById('resultCount').textContent = `${jobs.length} job${jobs.length !== 1 ? 's' : ''}`;
+
+  if (!jobs.length) {
+    grid.innerHTML = `<div class="empty">
+      <div class="empty-icon">🔍</div>
+      <h3>No jobs found</h3>
+      <p style="font-size:11px;margin-top:6px;">Try relaxing your filters or wait for the next fetch cycle.</p>
+    </div>`;
+    return;
+  }
+
+  grid.innerHTML = jobs.map(renderCard).join('');
+
+  // Expand buttons for long tweets
+  grid.querySelectorAll('.job-text').forEach(el => {
+    if (el.scrollHeight > el.clientHeight + 4) {
+      el.nextElementSibling.style.display = 'block';
+    }
+  });
+}
+
+function renderCard(job) {
+  const initials  = (job.author_name || job.author_handle || '?').slice(0, 2).toUpperCase();
+  const verified  = job.author_verified ? '<span class="verified-badge">✓</span>' : '';
+  const age       = timeAgo(job.posted_at);
+  const subspace  = job.subspace  || 'other';
+  const roleLabel = job.role_type || 'other';
+  const remote    = job.remote === true ? 'Remote' : job.remote === false ? 'On-site' : null;
+  const seniority = job.seniority;
+  const isNew     = job.posted_at && (Date.now() - new Date(job.posted_at)) < 6 * 3600 * 1000;
+
+  const dmUrl   = `https://x.com/messages/compose?recipient_id=&text=Hi%20%40${job.author_handle}%2C%20saw%20your%20hiring%20tweet!`;
+  const tweetUrl = job.tweet_url || `https://x.com/${job.author_handle}`;
+
+  const confPct = Math.round((job.confidence || 0) * 100);
+
+  return `
+<div class="job-card ${isNew ? 'new-card' : ''}" data-subspace="${subspace}" data-id="${job.tweet_id}">
+  <div class="job-author">
+    <div class="author-avatar">${initials}</div>
+    <div class="author-info">
+      <div class="author-name">${esc(job.author_name || job.author_handle)}${verified}</div>
+      <div class="author-handle">@${esc(job.author_handle)}
+        ${job.author_followers ? ` · ${fmtFollowers(job.author_followers)} followers` : ''}
+      </div>
+      ${job.author_bio ? `<div class="author-bio" title="${esc(job.author_bio)}">${esc(job.author_bio.slice(0, 80))}${job.author_bio.length > 80 ? '…' : ''}</div>` : ''}
+    </div>
+  </div>
+
+  <div class="job-tags">
+    <span class="chip chip-subspace-${subspace}">${subspaceLabel(subspace)}</span>
+    <span class="chip chip-role">${roleLabel}</span>
+    ${remote !== null ? `<span class="chip chip-remote-${job.remote}">${remote}</span>` : ''}
+    ${seniority ? `<span class="chip chip-seniority">${seniority}</span>` : ''}
+  </div>
+
+  <div>
+    <div class="job-text" id="txt-${job.tweet_id}">${esc(job.tweet_text || '')}</div>
+    <button class="expand-btn" onclick="expandText('${job.tweet_id}')">Show more ▾</button>
+  </div>
+
+  ${job.ai_summary ? `<div class="job-summary">${esc(job.ai_summary)}</div>` : ''}
+
+  <div>
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-bottom:3px;">
+      <span>AI confidence</span><span>${confPct}%</span>
+    </div>
+    <div class="confidence-bar"><div class="confidence-fill" style="width:${confPct}%"></div></div>
+  </div>
+
+  <div class="job-footer">
+    <div class="job-meta">
+      <span>🕐 ${age}</span>
+      <span>♥ ${fmt(job.likes)}</span>
+      ${job.views ? `<span>👁 ${fmtViews(job.views)}</span>` : ''}
+    </div>
+    <div class="job-actions">
+      <a class="action-btn dm" href="${tweetUrl}" target="_blank">View tweet ↗</a>
+      <button class="action-btn filled" onclick="markFilled('${job.tweet_id}', this)">✓ Filled</button>
+      <button class="action-btn archive" onclick="archiveJob('${job.tweet_id}', this)" title="Archive">✕</button>
+    </div>
+  </div>
+</div>`;
+}
+
+function expandText(id) {
+  const el = document.getElementById('txt-' + id);
+  if (!el) return;
+  el.classList.toggle('expanded');
+  el.nextElementSibling.textContent = el.classList.contains('expanded') ? 'Show less ▴' : 'Show more ▾';
+}
+
+function renderSidebar(roles, subspaces) {
+  const rolesEl = document.getElementById('sidebarRoles');
+  rolesEl.innerHTML = roles.map(r => `
+    <div class="filter-opt" onclick="setRole('${r.role_type}')">
+      <span>${r.role_type || 'other'}</span>
+      <span class="badge">${r.count}</span>
+    </div>`).join('') || '<span style="color:var(--muted);font-size:11px;padding:4px 8px;display:block;">No data yet</span>';
+
+  const subsEl = document.getElementById('sidebarSubspaces');
+  subsEl.innerHTML = subspaces.map(s => `
+    <div class="filter-opt ${s.subspace === activeSubspace ? 'active' : ''}" onclick="setSubspaceFromSidebar('${s.subspace}', this)">
+      <span>${subspaceLabel(s.subspace)}</span>
+      <span class="badge">${s.count}</span>
+    </div>`).join('') || '<span style="color:var(--muted);font-size:11px;padding:4px 8px;display:block;">No data yet</span>';
+}
+
+// ─── Filter helpers ─────────────────────────────────────────────────────────────
+function applyFilters() { loadJobs(); }
+
+function debounceSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadJobs(), 400);
+}
+
+function setSubspace(s, btn) {
+  activeSubspace = s;
+  document.querySelectorAll('.subspace-bar .tag-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadJobs();
+}
+
+function setSubspaceFromSidebar(s, el) {
+  activeSubspace = s;
+  document.querySelectorAll('.subspace-bar .tag-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.subspace === s);
+  });
+  loadJobs();
+}
+
+function setRole(role) {
+  document.getElementById('filterRole').value = role;
+  loadJobs();
+}
+
+// ─── Actions ───────────────────────────────────────────────────────────────────
+async function archiveJob(id, btn) {
+  btn.disabled = true;
+  try {
+    await fetch(`/api/jobs/${id}/archive`, { method: 'PATCH' });
+    const card = document.querySelector(`[data-id="${id}"]`);
+    if (card) card.remove();
+    toast('Archived');
+    loadStats();
+  } catch (e) { btn.disabled = false; }
+}
+
+async function markFilled(id, btn) {
+  btn.disabled = true;
+  try {
+    await fetch(`/api/jobs/${id}/filled`, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ filled: true }) });
+    const card = document.querySelector(`[data-id="${id}"]`);
+    if (card) card.remove();
+    toast('Marked as filled');
+    loadStats();
+  } catch (e) { btn.disabled = false; }
+}
+
+async function triggerFetch() {
+  const btn = document.getElementById('fetchBtn');
+  btn.disabled = true; btn.textContent = '↻ Fetching…';
+  try {
+    await fetch('/api/fetch', { method: 'POST' });
+    toast('Fetch started — results in ~2 min');
+    setTimeout(() => { loadStats(); loadJobs(); }, 15000);
+  } catch (e) {}
+  setTimeout(() => { btn.disabled = false; btn.textContent = '↻ Fetch'; }, 5000);
+}
+
+// ─── VIP modal ─────────────────────────────────────────────────────────────────
+async function openVipModal() {
+  document.getElementById('vipModal').classList.add('open');
+  await loadVipList();
+}
+function closeVipModal(e) {
+  if (e && e.target !== document.getElementById('vipModal')) return;
+  document.getElementById('vipModal').classList.remove('open');
+}
+
+async function loadVipList() {
+  try {
+    const r = await fetch('/api/vip');
+    const d = await r.json();
+    const list = document.getElementById('vipList');
+    if (!d.vip.length) {
+      list.innerHTML = '<span style="color:var(--muted);font-size:11px;">No VIPs added yet.</span>';
+      return;
+    }
+    list.innerHTML = d.vip.map(v => `
+      <div class="vip-row">
+        <span>@${v.handle}</span>
+        <button class="vip-remove" onclick="removeVip('${v.handle}')">×</button>
+      </div>`).join('');
+  } catch (e) {}
+}
+
+async function addVip() {
+  const inp = document.getElementById('vipInput');
+  const handle = inp.value.trim().replace(/^@/, '');
+  if (!handle) return;
+  await fetch('/api/vip', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ handle }) });
+  inp.value = '';
+  await loadVipList();
+  toast(`@${handle} added to VIP list`);
+}
+
+async function removeVip(handle) {
+  await fetch(`/api/vip/${handle}`, { method: 'DELETE' });
+  await loadVipList();
+  toast(`@${handle} removed`);
+}
+
+// ─── Utilities ─────────────────────────────────────────────────────────────────
+function esc(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmt(n) {
+  n = parseInt(n, 10) || 0;
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return String(n);
+}
+
+function fmtViews(n) {
+  n = parseInt(n, 10) || 0;
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1000)      return (n / 1000).toFixed(0) + 'k';
+  return String(n);
+}
+
+function fmtFollowers(n) {
+  n = parseInt(n, 10) || 0;
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1000)      return (n / 1000).toFixed(0) + 'k';
+  return String(n);
+}
+
+function timeAgo(ts) {
+  if (!ts) return '—';
+  const diff = (Date.now() - new Date(ts)) / 1000;
+  if (diff < 60)   return `${Math.round(diff)}s`;
+  if (diff < 3600) return `${Math.round(diff / 60)}m`;
+  if (diff < 86400) return `${Math.round(diff / 3600)}h`;
+  return `${Math.round(diff / 86400)}d`;
+}
+
+function subspaceLabel(s) {
+  const map = {
+    prediction_markets: '📊 Pred Markets',
+    defi:               '🌊 DeFi',
+    trading:            '📈 Trading',
+    nft:                '🎨 NFT',
+    infrastructure:     '🔧 Infra',
+    general_web3:       '🌐 Web3',
+    other:              '🔗 Other',
+  };
+  return map[s] || s;
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>

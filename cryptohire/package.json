@@ -1,0 +1,25 @@
+{
+  "name": "cryptohire",
+  "version": "1.0.0",
+  "description": "Crypto/Web3 hiring tweet radar — finds job posts from the space even when they use zero crypto keywords",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-cron": "^3.0.3",
+    "pg": "^8.11.5",
+    "rettiwt-api": "^6.2.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}
