@@ -87,13 +87,7 @@ async function fetchViralTweets() {
   let page      = 0;
 
   do {
-    let result;
-    try {
-      result = await client.tweet.search(filter, 20, cursor);
-    } catch (err) {
-      console.error(`[Twitter] search error (page ${page}):`, err.message ?? err);
-      break;
-    }
+    const result = await client.tweet.search(filter, 20, cursor);
 
     const tweets = result?.list ?? [];
     if (!tweets.length) break;
@@ -188,13 +182,7 @@ async function deepBackfill() {
   let page      = 0;
 
   do {
-    let result;
-    try {
-      result = await client.tweet.search(filter, 20, cursor);
-    } catch (err) {
-      console.error(`[Twitter] deepBackfill search error (page ${page}):`, err.message ?? err);
-      break;
-    }
+    const result = await client.tweet.search(filter, 20, cursor);
 
     const tweets = result?.list ?? [];
     if (!tweets.length) break;
