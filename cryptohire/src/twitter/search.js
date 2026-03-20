@@ -17,26 +17,26 @@ function sleep(ms) {
 // We run all queries every cycle and dedup by tweet_id via the seen_tweets
 // table, so processing each tweet exactly once.
 
-// EVERY query requires at least one explicit crypto/web3 term so Twitter
-// pre-filters the noise. The AI classifier then confirms it's a real job post.
-const CRYPTO = '(web3 OR crypto OR blockchain OR defi OR nft OR dao OR solana OR ethereum)';
+// Simple natural-language queries — Twitter handles these perfectly.
+// No complex boolean chains, no parentheses groups.
+// Every query has both a hiring signal AND a crypto signal baked in.
 
 const QUERIES = [
-  // Core: hiring + crypto keyword
-  `${CRYPTO} hiring -filter:replies`,
-  // Open role
-  `${CRYPTO} "open role" -filter:replies`,
-  `${CRYPTO} "open position" -filter:replies`,
-  // We are hiring
-  `${CRYPTO} "we are hiring" -filter:replies`,
-  // Looking for
-  `${CRYPTO} "looking for" (engineer OR developer OR analyst OR researcher OR trader OR designer OR manager) -filter:replies`,
-  // Seeking
-  `${CRYPTO} seeking (engineer OR developer OR analyst OR researcher OR trader) -filter:replies`,
-  // Community / social / marketing
-  `${CRYPTO} hiring (community OR marketing OR "social media" OR growth OR content) -filter:replies`,
-  // BD / partnerships
-  `${CRYPTO} hiring (partnerships OR "business development") -filter:replies`,
+  'hiring crypto native -filter:replies',
+  'hiring web3 -filter:replies',
+  'hiring defi -filter:replies',
+  'hiring blockchain -filter:replies',
+  'hiring solana -filter:replies',
+  'hiring ethereum -filter:replies',
+  'hiring nft -filter:replies',
+  'web3 open role -filter:replies',
+  'crypto open position -filter:replies',
+  'web3 looking for engineer -filter:replies',
+  'crypto looking for developer -filter:replies',
+  'defi looking for analyst -filter:replies',
+  'web3 community manager hiring -filter:replies',
+  'crypto marketing hiring -filter:replies',
+  'web3 growth hiring -filter:replies',
 ];
 
 // ─── Parse a rettiwt Tweet into our raw job candidate shape ──────────────────
@@ -61,6 +61,27 @@ function tweetToCandidate(tweet) {
                               ? `https://x.com/${user.userName}/status/${tweet.id}`
                               : null),
   };
+}
+
+// ─── Hard pre-filter ──────────────────────────────────────────────────────────
+// Twitter's search is fuzzy — it matches across bios, names, and handles,
+// not just tweet text. This means a tweet like "FREE $SOL in your wallet"
+// can appear in a "hiring" search if the author's bio mentions hiring.
+// We reject anything that doesn't contain at least one hiring keyword in
+// the actual tweet text. This happens before the AI ever sees the tweet.
+
+const HIRING_TERMS = [
+  'hiring', ' hire ', 'we hire', 'we\'re hiring', 'now hiring',
+  'looking for', 'open role', 'open position', 'open to hiring',
+  'we are hiring', 'join our team', 'join us', 'apply now', 'apply here',
+  'seeking a', 'seeking an', 'seeking candidates', 'seeking applicants',
+  'dm to apply', 'dm me if', 'send your cv', 'send cv', 'send resume',
+  'job opening', 'job opportunity', 'work with us',
+];
+
+function looksLikeHiring(text) {
+  const lower = (text || '').toLowerCase();
+  return HIRING_TERMS.some((t) => lower.includes(t));
 }
 
 // ─── Run a single search query, return unseen candidates ─────────────────────
@@ -88,9 +109,13 @@ async function runQuery(client, queryString, label) {
     const tweets = result?.list ?? [];
     if (!tweets.length) break;
 
+    let kept = 0, dropped = 0;
     for (const tweet of tweets) {
+      if (!looksLikeHiring(tweet.fullText)) { dropped++; continue; }
       candidates.push(tweetToCandidate(tweet));
+      kept++;
     }
+    if (dropped) console.log(`[Twitter] "${label}" pre-filter: kept ${kept}, dropped ${dropped} (no hiring keyword in text)`);
 
     cursor = result?.next?.value;
     page++;
