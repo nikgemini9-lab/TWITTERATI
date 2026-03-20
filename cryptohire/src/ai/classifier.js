@@ -1,26 +1,35 @@
 'use strict';
 
-const Anthropic = require('@anthropic-ai/sdk');
-const config    = require('../config');
+const OpenAI = require('openai');
+const config = require('../config');
 
 const ROLE_TYPES  = ['engineer', 'researcher', 'trader', 'analyst', 'marketing', 'ops', 'design', 'bd', 'content', 'other'];
 const SUBSPACES   = ['prediction_markets', 'defi', 'trading', 'nft', 'infrastructure', 'general_web3', 'other'];
-const SENIORITIES = ['junior', 'mid', 'senior', 'lead', 'any'];
-const CONTACTS    = ['dm', 'email', 'link', 'apply'];
 
 const ROLE_SET     = new Set(ROLE_TYPES);
 const SUBSPACE_SET = new Set(SUBSPACES);
 
-const API_KEY = process.env.ANTHROPIC_API_KEY;
+const API_KEY = process.env.GROQ_API_KEY;
 if (!API_KEY) {
-  console.warn('[AI] ANTHROPIC_API_KEY not set — classification disabled');
+  console.warn('[AI] GROQ_API_KEY not set — classification disabled');
 }
 
+// Groq exposes an OpenAI-compatible API — just point the base URL at their endpoint.
+// Free tier: https://console.groq.com  (no credit card required)
 let _client = null;
 function getClient() {
-  if (!_client) _client = new Anthropic({ apiKey: API_KEY });
+  if (!_client) {
+    _client = new OpenAI({
+      apiKey:  API_KEY,
+      baseURL: 'https://api.groq.com/openai/v1',
+    });
+  }
   return _client;
 }
+
+// llama-3.1-8b-instant — fast, free tier, good at structured JSON output
+// Fallback: llama-3.3-70b-versatile (slower but smarter, also free tier)
+const MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 //
@@ -52,13 +61,13 @@ Rules:
 - Use author bio heavily — a vague tweet from a known crypto person IS crypto hiring
 - Confidence: 0.0–1.0. Be conservative. If unsure, give 0.5 or lower.
 - ai_summary: one concise sentence describing the role (e.g. "Prediction markets startup hiring a mid-level researcher, remote, DM to apply")
-- Reply ONLY with a valid JSON array. No markdown, no explanation.
+- Reply ONLY with a valid JSON array. No markdown, no explanation, no code fences.
 
 Format: [{"tweet_id":"...","is_crypto_hiring":bool,"confidence":0.0,"role_type":"...","subspace":"...","remote":bool|null,"seniority":"..."|null,"contact_method":"..."|null,"ai_summary":"..."}]`;
 
 // ─── Batch classify ───────────────────────────────────────────────────────────
 
-const BATCH_SIZE = 20; // keep prompt size reasonable
+const BATCH_SIZE = 15; // slightly smaller than before — 8B model has shorter context
 
 async function classifyBatch(candidates) {
   if (!API_KEY || !candidates.length) return [];
@@ -83,19 +92,20 @@ async function classifyChunk(candidates) {
     })
     .join('\n\n');
 
-  const userMessage = `Classify these tweets:\n\n${list}`;
-
   let raw;
   try {
-    const response = await getClient().messages.create({
-      model:      'claude-haiku-4-5-20251001',
-      max_tokens: 2048,
-      system:     SYSTEM_PROMPT,
-      messages:   [{ role: 'user', content: userMessage }],
+    const response = await getClient().chat.completions.create({
+      model:       MODEL,
+      max_tokens:  2048,
+      temperature: 0,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user',   content: `Classify these tweets:\n\n${list}` },
+      ],
     });
-    raw = response.content[0]?.text?.trim() || '[]';
+    raw = response.choices[0]?.message?.content?.trim() || '[]';
   } catch (err) {
-    console.error('[AI] Claude API error:', err.message);
+    console.error('[AI] Groq API error:', err.message);
     return [];
   }
 
@@ -108,7 +118,6 @@ async function classifyChunk(candidates) {
     return [];
   }
 
-  // Build a map of tweet_id → candidate for quick lookup
   const candidateMap = new Map(candidates.map((c) => [c.tweet_id, c]));
 
   const jobs = [];
@@ -122,8 +131,8 @@ async function classifyChunk(candidates) {
 
     jobs.push({
       ...candidate,
-      role_type:      ROLE_SET.has(entry.role_type)     ? entry.role_type     : 'other',
-      subspace:       SUBSPACE_SET.has(entry.subspace)  ? entry.subspace      : 'general_web3',
+      role_type:      ROLE_SET.has(entry.role_type)    ? entry.role_type    : 'other',
+      subspace:       SUBSPACE_SET.has(entry.subspace) ? entry.subspace     : 'general_web3',
       remote:         entry.remote ?? null,
       seniority:      entry.seniority || null,
       contact_method: entry.contact_method || null,
@@ -132,7 +141,7 @@ async function classifyChunk(candidates) {
     });
   }
 
-  console.log(`[AI] chunk of ${candidates.length} → ${jobs.length} crypto jobs (threshold ${config.minConfidence})`);
+  console.log(`[AI] chunk of ${candidates.length} → ${jobs.length} crypto jobs (model: ${MODEL})`);
   return jobs;
 }
 
