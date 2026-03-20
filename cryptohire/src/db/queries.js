@@ -2,22 +2,34 @@
 
 const { query } = require('./index');
 
+// SQLite stores booleans as 0/1 integers — coerce back to JS booleans for the API
+function coerceJob(row) {
+  return {
+    ...row,
+    author_verified: Boolean(row.author_verified),
+    remote:          row.remote === null ? null : Boolean(row.remote),
+    is_archived:     Boolean(row.is_archived),
+    is_filled:       Boolean(row.is_filled),
+  };
+}
+
 // ─── Seen-tweet dedup ─────────────────────────────────────────────────────────
 
 async function markSeen(tweetIds) {
   if (!tweetIds.length) return;
-  const values = tweetIds.map((id, i) => `($${i + 1})`).join(', ');
+  const placeholders = tweetIds.map(() => '(?)').join(', ');
   await query(
-    `INSERT INTO seen_tweets (tweet_id) VALUES ${values} ON CONFLICT DO NOTHING`,
+    `INSERT INTO seen_tweets (tweet_id) VALUES ${placeholders} ON CONFLICT DO NOTHING`,
     tweetIds
   );
 }
 
 async function filterUnseen(tweetIds) {
   if (!tweetIds.length) return [];
+  const placeholders = tweetIds.map(() => '?').join(', ');
   const { rows } = await query(
-    `SELECT tweet_id FROM seen_tweets WHERE tweet_id = ANY($1)`,
-    [tweetIds]
+    `SELECT tweet_id FROM seen_tweets WHERE tweet_id IN (${placeholders})`,
+    tweetIds
   );
   const seen = new Set(rows.map((r) => r.tweet_id));
   return tweetIds.filter((id) => !seen.has(id));
@@ -33,23 +45,23 @@ async function upsertJob(job) {
       posted_at, tweet_url,
       role_type, subspace, remote, seniority, contact_method, ai_summary,
       confidence, classified_at, last_updated
-    ) VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
-      $14,$15,$16,$17,$18,$19,$20,NOW(),NOW()
-    )
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))
     ON CONFLICT (tweet_id) DO UPDATE SET
-      likes           = EXCLUDED.likes,
-      retweets        = EXCLUDED.retweets,
-      replies         = EXCLUDED.replies,
-      views           = EXCLUDED.views,
-      last_updated    = NOW()`,
+      likes        = excluded.likes,
+      retweets     = excluded.retweets,
+      replies      = excluded.replies,
+      views        = excluded.views,
+      last_updated = datetime('now')`,
     [
       job.tweet_id, job.author_handle, job.author_name, job.author_bio,
-      job.author_followers, job.author_verified, job.tweet_text,
+      job.author_followers,
+      job.author_verified ? 1 : 0,
+      job.tweet_text,
       job.likes, job.retweets, job.replies, job.views,
       job.posted_at, job.tweet_url,
-      job.role_type, job.subspace, job.remote, job.seniority,
-      job.contact_method, job.ai_summary, job.confidence,
+      job.role_type, job.subspace,
+      job.remote === null || job.remote === undefined ? null : (job.remote ? 1 : 0),
+      job.seniority, job.contact_method, job.ai_summary, job.confidence,
     ]
   );
 }
@@ -57,75 +69,82 @@ async function upsertJob(job) {
 async function getJobs(filters = {}) {
   const conditions = ['NOT is_archived'];
   const params     = [];
-  let   p          = 1;
 
   if (filters.role_type && filters.role_type !== 'all') {
-    conditions.push(`role_type = $${p++}`);
+    conditions.push('role_type = ?');
     params.push(filters.role_type);
   }
   if (filters.subspace && filters.subspace !== 'all') {
-    conditions.push(`subspace = $${p++}`);
+    conditions.push('subspace = ?');
     params.push(filters.subspace);
   }
   if (filters.remote !== undefined && filters.remote !== '') {
-    conditions.push(`remote = $${p++}`);
-    params.push(filters.remote === 'true');
+    conditions.push('remote = ?');
+    params.push(filters.remote === 'true' ? 1 : 0);
   }
   if (filters.seniority && filters.seniority !== 'all') {
-    conditions.push(`seniority = $${p++}`);
+    conditions.push('seniority = ?');
     params.push(filters.seniority);
   }
   if (filters.search) {
-    conditions.push(`(tweet_text ILIKE $${p} OR author_handle ILIKE $${p} OR ai_summary ILIKE $${p})`);
-    params.push(`%${filters.search}%`);
-    p++;
+    // SQLite LIKE is case-insensitive for ASCII by default
+    conditions.push('(tweet_text LIKE ? OR author_handle LIKE ? OR ai_summary LIKE ?)');
+    params.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`);
   }
   if (filters.is_filled === 'true') {
-    conditions.push('is_filled = TRUE');
+    conditions.push('is_filled = 1');
   } else {
-    conditions.push('is_filled = FALSE');
+    conditions.push('is_filled = 0');
   }
 
   const where = conditions.join(' AND ');
   const sort  = filters.sort === 'likes'    ? 'likes DESC'
               : filters.sort === 'earliest' ? 'posted_at ASC'
               :                               'posted_at DESC';
-
   const limit = Math.min(parseInt(filters.limit, 10) || 200, 500);
+  params.push(limit);
 
   const { rows } = await query(
-    `SELECT * FROM jobs WHERE ${where} ORDER BY ${sort} LIMIT $${p}`,
-    [...params, limit]
+    `SELECT * FROM jobs WHERE ${where} ORDER BY ${sort} LIMIT ?`,
+    params
   );
-  return rows;
+  return rows.map(coerceJob);
 }
 
 async function archiveJob(tweetId) {
   await query(
-    `UPDATE jobs SET is_archived = TRUE, archived_at = NOW() WHERE tweet_id = $1`,
+    `UPDATE jobs SET is_archived = 1, archived_at = datetime('now') WHERE tweet_id = ?`,
     [tweetId]
   );
 }
 
 async function markFilled(tweetId, filled) {
   await query(
-    `UPDATE jobs SET is_filled = $1, last_updated = NOW() WHERE tweet_id = $2`,
-    [filled, tweetId]
+    `UPDATE jobs SET is_filled = ?, last_updated = datetime('now') WHERE tweet_id = ?`,
+    [filled ? 1 : 0, tweetId]
   );
 }
 
 async function getStats() {
   const { rows } = await query(`
     SELECT
-      COUNT(*)                                        AS total,
-      COUNT(*) FILTER (WHERE NOT is_archived AND NOT is_filled) AS active,
-      COUNT(*) FILTER (WHERE is_filled)               AS filled,
-      COUNT(*) FILTER (WHERE remote = TRUE)           AS remote,
-      COUNT(*) FILTER (WHERE posted_at > NOW() - INTERVAL '24h' AND NOT is_archived) AS last_24h,
-      COUNT(*) FILTER (WHERE posted_at > NOW() - INTERVAL '7d'  AND NOT is_archived) AS last_7d
+      COUNT(*)                                                                        AS total,
+      COUNT(*) FILTER (WHERE NOT is_archived AND NOT is_filled)                      AS active,
+      COUNT(*) FILTER (WHERE is_filled)                                              AS filled,
+      COUNT(*) FILTER (WHERE remote = 1)                                             AS remote,
+      COUNT(*) FILTER (WHERE posted_at > datetime('now', '-24 hours') AND NOT is_archived) AS last_24h,
+      COUNT(*) FILTER (WHERE posted_at > datetime('now', '-7 days')   AND NOT is_archived) AS last_7d
     FROM jobs
   `);
-  return rows[0];
+  const r = rows[0];
+  return {
+    total:    Number(r.total),
+    active:   Number(r.active),
+    filled:   Number(r.filled),
+    remote:   Number(r.remote),
+    last_24h: Number(r.last_24h),
+    last_7d:  Number(r.last_7d),
+  };
 }
 
 async function getRoleStats() {
@@ -136,7 +155,7 @@ async function getRoleStats() {
     GROUP BY role_type
     ORDER BY count DESC
   `);
-  return rows;
+  return rows.map((r) => ({ role_type: r.role_type, count: Number(r.count) }));
 }
 
 async function getSubspaceStats() {
@@ -147,7 +166,7 @@ async function getSubspaceStats() {
     GROUP BY subspace
     ORDER BY count DESC
   `);
-  return rows;
+  return rows.map((r) => ({ subspace: r.subspace, count: Number(r.count) }));
 }
 
 // ─── VIP watchlist ────────────────────────────────────────────────────────────
@@ -159,17 +178,17 @@ async function getVipWatchlist() {
 
 async function addToVipWatchlist(handle) {
   await query(
-    `INSERT INTO vip_watchlist (handle) VALUES ($1) ON CONFLICT DO NOTHING`,
+    `INSERT INTO vip_watchlist (handle) VALUES (?) ON CONFLICT DO NOTHING`,
     [handle.toLowerCase().replace(/^@/, '')]
   );
 }
 
 async function removeFromVipWatchlist(handle) {
-  await query(`DELETE FROM vip_watchlist WHERE handle = $1`, [handle.toLowerCase()]);
+  await query(`DELETE FROM vip_watchlist WHERE handle = ?`, [handle.toLowerCase()]);
 }
 
 async function setVipUserId(handle, userId) {
-  await query(`UPDATE vip_watchlist SET user_id = $1 WHERE handle = $2`, [userId, handle]);
+  await query(`UPDATE vip_watchlist SET user_id = ? WHERE handle = ?`, [userId, handle]);
 }
 
 module.exports = {

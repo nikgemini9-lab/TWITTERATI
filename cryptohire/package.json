@@ -8,12 +8,12 @@
     "dev": "nodemon src/index.js"
   },
   "dependencies": {
+    "@libsql/client": "^0.14.0",
     "openai": "^4.68.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "node-cron": "^3.0.3",
-    "pg": "^8.11.5",
     "rettiwt-api": "^6.2.0"
   },
   "devDependencies": {

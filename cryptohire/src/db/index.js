@@ -1,34 +1,41 @@
-const { Pool } = require('pg');
+'use strict';
+
+const { createClient } = require('@libsql/client');
 const fs   = require('fs');
 const path = require('path');
 
-function sslConfig() {
-  const url = process.env.DATABASE_URL || '';
-  if (url.includes('localhost') || url.includes('127.0.0.1')) return false;
-  return { rejectUnauthorized: false };
+const TURSO_URL        = process.env.TURSO_URL;
+const TURSO_AUTH_TOKEN = process.env.TURSO_AUTH_TOKEN;
+
+if (!TURSO_URL) {
+  console.warn('[DB] TURSO_URL not set');
 }
 
-const pool = new Pool({
-  connectionString:        process.env.DATABASE_URL,
-  ssl:                     sslConfig(),
-  max:                     10,
-  idleTimeoutMillis:       30000,
-  connectionTimeoutMillis: 8000,
-});
+let _client = null;
+function getClient() {
+  if (!_client) {
+    _client = createClient({
+      url:       TURSO_URL,
+      authToken: TURSO_AUTH_TOKEN,
+    });
+  }
+  return _client;
+}
 
-pool.on('error', (err) => {
-  console.error('[DB] Pool error:', err?.message || err);
-});
+// Thin wrapper — returns { rows } like pg did so queries.js stays clean
+async function query(sql, args = []) {
+  const rs = await getClient().execute({ sql, args });
+  return { rows: rs.rows };
+}
 
 async function initSchema() {
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
-  const client = await pool.connect();
-  try {
-    await client.query(schema);
-    console.log('[DB] Schema initialised');
-  } finally {
-    client.release();
+  // Run each statement individually (libsql doesn't support multi-statement exec)
+  const statements = schema.split(';').map((s) => s.trim()).filter(Boolean);
+  for (const sql of statements) {
+    await getClient().execute(sql);
   }
+  console.log('[DB] Schema initialised');
 }
 
-module.exports = { pool, query: (...args) => pool.query(...args), initSchema };
+module.exports = { query, initSchema };
