@@ -306,6 +306,10 @@
     <div class="hstat"><div class="hstat-val" id="stat24h">—</div><div class="hstat-lbl">Last 24h</div></div>
     <div class="hstat"><div class="hstat-val" id="stat7d">—</div><div class="hstat-lbl">Last 7d</div></div>
     <div class="hstat"><div class="hstat-val" id="statRemote">—</div><div class="hstat-lbl">Remote</div></div>
+    <div class="hstat" title="Tweets already seen/skipped by crawler. High = classifier is being starved." style="cursor:help">
+      <div class="hstat-val" id="statSeen" style="font-size:12px;color:var(--muted)">—</div>
+      <div class="hstat-lbl">Seen cache</div>
+    </div>
     <button class="btn" onclick="openVipModal()">⭐ VIPs</button>
     <button class="btn primary" onclick="triggerFetch()" id="fetchBtn">↻ Fetch</button>
   </div>
@@ -458,6 +462,7 @@ async function loadStats() {
     document.getElementById('stat24h').textContent     = fmt(d.stats.last_24h);
     document.getElementById('stat7d').textContent      = fmt(d.stats.last_7d);
     document.getElementById('statRemote').textContent  = fmt(d.stats.remote);
+    document.getElementById('statSeen').textContent    = fmt(d.stats.seen_count);
 
     // Cookie health
     const health = d.stats.scheduler?.cookieHealth || {};

@@ -191,8 +191,17 @@ async function setVipUserId(handle, userId) {
   await query(`UPDATE vip_watchlist SET user_id = ? WHERE handle = ?`, [userId, handle]);
 }
 
+async function clearSeen() {
+  await query(`DELETE FROM seen_tweets`);
+}
+
+async function getSeenCount() {
+  const { rows } = await query(`SELECT COUNT(*) AS n FROM seen_tweets`);
+  return Number(rows[0].n);
+}
+
 module.exports = {
-  markSeen, filterUnseen,
+  markSeen, filterUnseen, clearSeen, getSeenCount,
   upsertJob, getJobs, archiveJob, markFilled,
   getStats, getRoleStats, getSubspaceStats,
   getVipWatchlist, addToVipWatchlist, removeFromVipWatchlist, setVipUserId,

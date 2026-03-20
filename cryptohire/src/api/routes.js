@@ -5,6 +5,7 @@ const {
   getJobs, archiveJob, markFilled,
   getStats, getRoleStats, getSubspaceStats,
   getVipWatchlist, addToVipWatchlist, removeFromVipWatchlist,
+  clearSeen, getSeenCount,
 } = require('../db/queries');
 const { runFetch, state } = require('../scheduler');
 const config = require('../config');
@@ -62,13 +63,14 @@ function cookieHealth() {
 
 router.get('/stats', async (req, res) => {
   try {
-    const [stats, roles, subspaces] = await Promise.all([
-      getStats(), getRoleStats(), getSubspaceStats(),
+    const [stats, roles, subspaces, seenCount] = await Promise.all([
+      getStats(), getRoleStats(), getSubspaceStats(), getSeenCount(),
     ]);
     res.json({
       ok: true,
       stats: {
         ...stats,
+        seen_count: seenCount,
         scheduler: {
           lastFetch:              state.lastFetch,
           fetchRunning:           state.fetchRunning,
@@ -144,6 +146,21 @@ router.delete('/vip/:handle', async (req, res) => {
   try {
     await removeFromVipWatchlist(req.params.handle);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── DELETE /api/admin/seen-tweets ────────────────────────────────────────────
+// Clears the seen_tweets dedup table so all tweets get re-fetched and
+// re-classified on the next cycle. Use when the classifier was broken
+// (no API key, wrong key, etc.) and you want a clean slate.
+
+router.delete('/admin/seen-tweets', async (req, res) => {
+  try {
+    await clearSeen();
+    console.log('[Admin] seen_tweets table cleared');
+    res.json({ ok: true, message: 'seen_tweets cleared — next fetch will reprocess all tweets' });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
