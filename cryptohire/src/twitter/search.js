@@ -22,21 +22,23 @@ function sleep(ms) {
 // Every query has both a hiring signal AND a crypto signal baked in.
 
 const QUERIES = [
-  'hiring crypto native -filter:replies',
-  'hiring web3 -filter:replies',
-  'hiring defi -filter:replies',
-  'hiring blockchain -filter:replies',
-  'hiring solana -filter:replies',
-  'hiring ethereum -filter:replies',
-  'hiring nft -filter:replies',
-  'web3 open role -filter:replies',
-  'crypto open position -filter:replies',
-  'web3 looking for engineer -filter:replies',
-  'crypto looking for developer -filter:replies',
-  'defi looking for analyst -filter:replies',
-  'web3 community manager hiring -filter:replies',
-  'crypto marketing hiring -filter:replies',
-  'web3 growth hiring -filter:replies',
+  // 2-keyword combos — Twitter must find BOTH words anywhere in the tweet.
+  // Simple = more results. Pre-filter + AI do the quality control.
+  'crypto hiring -filter:replies',
+  'web3 hiring -filter:replies',
+  'defi hiring -filter:replies',
+  'blockchain hiring -filter:replies',
+  'solana hiring -filter:replies',
+  'ethereum hiring -filter:replies',
+  'nft hiring -filter:replies',
+  'dao hiring -filter:replies',
+  'crypto "open role" -filter:replies',
+  'web3 "open role" -filter:replies',
+  'crypto "open position" -filter:replies',
+  'web3 "open position" -filter:replies',
+  'crypto "looking for" -filter:replies',
+  'web3 "looking for" -filter:replies',
+  'solana "looking for" -filter:replies',
 ];
 
 // ─── Parse a rettiwt Tweet into our raw job candidate shape ──────────────────
@@ -71,12 +73,14 @@ function tweetToCandidate(tweet) {
 // the actual tweet text. This happens before the AI ever sees the tweet.
 
 const HIRING_TERMS = [
-  'hiring', ' hire ', 'we hire', 'we\'re hiring', 'now hiring',
-  'looking for', 'open role', 'open position', 'open to hiring',
-  'we are hiring', 'join our team', 'join us', 'apply now', 'apply here',
-  'seeking a', 'seeking an', 'seeking candidates', 'seeking applicants',
-  'dm to apply', 'dm me if', 'send your cv', 'send cv', 'send resume',
+  'hiring', 'hire', 'we\'re hiring', 'now hiring',
+  'looking for', 'open role', 'open position',
+  'we are hiring', 'join our team', 'join us',
+  'apply now', 'apply here', 'apply at', 'applications open',
+  'seeking a', 'seeking an', 'we need a', 'we need an',
+  'dm to apply', 'send your cv', 'send cv', 'send resume',
   'job opening', 'job opportunity', 'work with us',
+  'onboarding', 'new role', 'full-time', 'part-time', 'contract role',
 ];
 
 function looksLikeHiring(text) {
