@@ -17,26 +17,26 @@ function sleep(ms) {
 // We run all queries every cycle and dedup by tweet_id via the seen_tweets
 // table, so processing each tweet exactly once.
 
+// EVERY query requires at least one explicit crypto/web3 term so Twitter
+// pre-filters the noise. The AI classifier then confirms it's a real job post.
+const CRYPTO = '(web3 OR crypto OR blockchain OR defi OR nft OR dao OR solana OR ethereum)';
+
 const QUERIES = [
-  // Explicit hiring posts
-  'hiring -filter:replies',
-  // Open role announcements
-  '"open role" -filter:replies',
-  '"open position" -filter:replies',
-  // "we're hiring"
-  '"we are hiring" -filter:replies',
-  // "looking for" hiring pattern
-  '"looking for" hire role join -filter:replies',
-  // Seeking technical candidates
-  'seeking engineer researcher analyst trader -filter:replies',
-  // Web3 community / social / marketing roles
-  'web3 crypto "community manager" hiring -filter:replies',
-  'crypto blockchain "social media" hiring -filter:replies',
-  'web3 crypto "growth" "marketing" hiring -filter:replies',
-  'web3 crypto "content" hiring -filter:replies',
+  // Core: hiring + crypto keyword
+  `${CRYPTO} hiring -filter:replies`,
+  // Open role
+  `${CRYPTO} "open role" -filter:replies`,
+  `${CRYPTO} "open position" -filter:replies`,
+  // We are hiring
+  `${CRYPTO} "we are hiring" -filter:replies`,
+  // Looking for
+  `${CRYPTO} "looking for" (engineer OR developer OR analyst OR researcher OR trader OR designer OR manager) -filter:replies`,
+  // Seeking
+  `${CRYPTO} seeking (engineer OR developer OR analyst OR researcher OR trader) -filter:replies`,
+  // Community / social / marketing
+  `${CRYPTO} hiring (community OR marketing OR "social media" OR growth OR content) -filter:replies`,
   // BD / partnerships
-  'web3 crypto "business development" hiring -filter:replies',
-  'crypto defi "partnerships" hiring -filter:replies',
+  `${CRYPTO} hiring (partnerships OR "business development") -filter:replies`,
 ];
 
 // ─── Parse a rettiwt Tweet into our raw job candidate shape ──────────────────

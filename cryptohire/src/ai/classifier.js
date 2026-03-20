@@ -2,6 +2,7 @@
 
 const OpenAI = require('openai');
 const config = require('../config');
+const { getTrainingExamples } = require('../db/queries');
 
 const ROLE_TYPES  = ['engineer', 'researcher', 'trader', 'analyst', 'marketing', 'ops', 'design', 'bd', 'content', 'other'];
 const SUBSPACES   = ['prediction_markets', 'defi', 'trading', 'nft', 'infrastructure', 'general_web3', 'other'];
@@ -27,9 +28,9 @@ function getClient() {
   return _client;
 }
 
-// llama-3.1-8b-instant — fast, free tier, good at structured JSON output
-// Fallback: llama-3.3-70b-versatile (slower but smarter, also free tier)
-const MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+// llama-3.3-70b-versatile — smarter, still free tier on Groq, much fewer hallucinations
+// Override with GROQ_MODEL env var if needed (e.g. llama-3.1-8b-instant for speed)
+const MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 //
@@ -77,23 +78,65 @@ Format: [{"tweet_id":"...","is_crypto_hiring":bool,"confidence":0.0,"role_type":
 
 // ─── Batch classify ───────────────────────────────────────────────────────────
 
-const BATCH_SIZE = 15; // slightly smaller than before — 8B model has shorter context
+const BATCH_SIZE = 15;
+
+// Build the few-shot block from stored training examples.
+// Positive examples show what a real job looks like.
+// Negative examples (is_positive=0) show what to reject.
+function buildFewShotBlock(examples) {
+  if (!examples.length) return '';
+
+  const lines = ['', 'CALIBRATION EXAMPLES (use these to set your judgment bar):', ''];
+
+  const pos = examples.filter((e) => e.is_positive);
+  const neg = examples.filter((e) => !e.is_positive);
+
+  if (pos.length) {
+    lines.push('✅ REAL crypto job posts (is_crypto_hiring: true):');
+    for (const e of pos.slice(0, 5)) {
+      lines.push(`  Bio: ${(e.author_bio || '(none)').slice(0, 120)}`);
+      lines.push(`  Tweet: ${(e.tweet_text || '').slice(0, 200)}`);
+      if (e.role_type) lines.push(`  → role_type: ${e.role_type}, subspace: ${e.subspace || 'general_web3'}`);
+      lines.push('');
+    }
+  }
+
+  if (neg.length) {
+    lines.push('❌ NOT job posts — dismissed as trash (is_crypto_hiring: false):');
+    for (const e of neg.slice(0, 5)) {
+      lines.push(`  Bio: ${(e.author_bio || '(none)').slice(0, 120)}`);
+      lines.push(`  Tweet: ${(e.tweet_text || '').slice(0, 200)}`);
+      lines.push('');
+    }
+  }
+
+  return lines.join('\n');
+}
 
 async function classifyBatch(candidates) {
   if (!API_KEY || !candidates.length) return [];
 
-  const results = [];
+  // Load recent training examples once per batch run
+  let examples = [];
+  try {
+    examples = await getTrainingExamples(20);
+  } catch (err) {
+    console.warn('[AI] Could not load training examples:', err.message);
+  }
 
+  const fewShot = buildFewShotBlock(examples);
+
+  const results = [];
   for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
     const batch = candidates.slice(i, i + BATCH_SIZE);
-    const chunk = await classifyChunk(batch);
+    const chunk = await classifyChunk(batch, fewShot);
     results.push(...chunk);
   }
 
   return results;
 }
 
-async function classifyChunk(candidates) {
+async function classifyChunk(candidates, fewShot = '') {
   const list = candidates
     .map((c, idx) => {
       const bio = (c.author_bio || '').slice(0, 160);
@@ -104,12 +147,13 @@ async function classifyChunk(candidates) {
 
   let raw;
   try {
+    const systemContent = fewShot ? `${SYSTEM_PROMPT}\n${fewShot}` : SYSTEM_PROMPT;
     const response = await getClient().chat.completions.create({
       model:       MODEL,
       max_tokens:  2048,
       temperature: 0,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemContent },
         { role: 'user',   content: `Classify these tweets:\n\n${list}` },
       ],
     });

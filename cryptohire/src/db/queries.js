@@ -112,10 +112,13 @@ async function getJobs(filters = {}) {
 }
 
 async function archiveJob(tweetId) {
+  // Fetch the job first so the caller can save it as a negative training example
+  const { rows } = await query(`SELECT * FROM jobs WHERE tweet_id = ?`, [tweetId]);
   await query(
     `UPDATE jobs SET is_archived = 1, archived_at = datetime('now') WHERE tweet_id = ?`,
     [tweetId]
   );
+  return rows[0] || null;
 }
 
 async function markFilled(tweetId, filled) {
@@ -191,6 +194,31 @@ async function setVipUserId(handle, userId) {
   await query(`UPDATE vip_watchlist SET user_id = ? WHERE handle = ?`, [userId, handle]);
 }
 
+// ─── Training examples ────────────────────────────────────────────────────────
+
+async function addTrainingExample(ex) {
+  const isPositive = ex.is_positive === false ? 0 : 1;
+  const { rows } = await query(
+    `INSERT INTO training_examples (tweet_text, author_bio, author_handle, role_type, subspace, is_positive, note)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     RETURNING id`,
+    [ex.tweet_text, ex.author_bio || '', ex.author_handle || '', ex.role_type || null, ex.subspace || null, isPositive, ex.note || null]
+  );
+  return rows[0]?.id;
+}
+
+async function getTrainingExamples(limit = 10) {
+  const { rows } = await query(
+    `SELECT * FROM training_examples ORDER BY added_at DESC LIMIT ?`,
+    [limit]
+  );
+  return rows;
+}
+
+async function deleteTrainingExample(id) {
+  await query(`DELETE FROM training_examples WHERE id = ?`, [id]);
+}
+
 async function clearSeen() {
   await query(`DELETE FROM seen_tweets`);
 }
@@ -205,4 +233,5 @@ module.exports = {
   upsertJob, getJobs, archiveJob, markFilled,
   getStats, getRoleStats, getSubspaceStats,
   getVipWatchlist, addToVipWatchlist, removeFromVipWatchlist, setVipUserId,
+  addTrainingExample, getTrainingExamples, deleteTrainingExample,
 };

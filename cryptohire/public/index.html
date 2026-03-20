@@ -311,6 +311,7 @@
       <div class="hstat-lbl">Seen cache</div>
     </div>
     <button class="btn" onclick="openVipModal()">⭐ VIPs</button>
+    <button class="btn" onclick="openTrainModal()" title="Feed confirmed jobs to the AI so it stops accepting trash">🧠 Train AI</button>
     <button class="btn primary" onclick="triggerFetch()" id="fetchBtn">↻ Fetch</button>
   </div>
 </header>
@@ -409,6 +410,62 @@
         <div class="loading-spinner"></div>
         <h3>Loading jobs…</h3>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Train AI Modal ────────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="trainModal" onclick="closeTrainModal(event)">
+  <div class="modal" style="max-width:560px;width:95vw">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <h3>🧠 Train AI — Feed Legit Jobs</h3>
+      <button class="modal-close" onclick="closeTrainModal()">×</button>
+    </div>
+    <p style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:12px;">
+      Paste the tweet text and author bio from a <strong>real crypto job post</strong>.
+      These become few-shot examples injected into every classifier prompt — Groq will learn from them immediately.
+      <br>Pressing <strong>X</strong> on any job card auto-saves it as a negative example (trash to reject).
+    </p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+      <textarea id="trainTweetText" placeholder="Paste the tweet text here…" rows="3"
+        style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:8px 10px;font-size:12px;resize:vertical;font-family:inherit;"></textarea>
+      <textarea id="trainAuthorBio" placeholder="Paste the author's Twitter bio here (helps a lot)…" rows="2"
+        style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:8px 10px;font-size:12px;resize:vertical;font-family:inherit;"></textarea>
+      <div style="display:flex;gap:8px;">
+        <input id="trainHandle" type="text" placeholder="@handle (optional)" style="flex:1" />
+        <select id="trainRole" style="flex:1">
+          <option value="">Role type…</option>
+          <option value="engineer">Engineer</option>
+          <option value="researcher">Researcher</option>
+          <option value="trader">Trader</option>
+          <option value="analyst">Analyst</option>
+          <option value="marketing">Marketing</option>
+          <option value="ops">Ops</option>
+          <option value="design">Design</option>
+          <option value="bd">BD</option>
+          <option value="content">Content</option>
+          <option value="other">Other</option>
+        </select>
+        <select id="trainSubspace" style="flex:1">
+          <option value="">Subspace…</option>
+          <option value="prediction_markets">Prediction Markets</option>
+          <option value="defi">DeFi</option>
+          <option value="trading">Trading</option>
+          <option value="nft">NFT</option>
+          <option value="infrastructure">Infrastructure</option>
+          <option value="general_web3">General Web3</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <button class="btn primary" onclick="submitTrainExample()" style="align-self:flex-end;height:34px;padding:0 16px;">
+        Submit as confirmed job ✓
+      </button>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:10px;">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">
+        Saved examples (<span id="trainCount">0</span> total)
+      </div>
+      <div id="trainList" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;"></div>
     </div>
   </div>
 </div>
@@ -736,6 +793,70 @@ async function removeVip(handle) {
   await fetch(`/api/vip/${handle}`, { method: 'DELETE' });
   await loadVipList();
   toast(`@${handle} removed`);
+}
+
+// ─── Train AI modal ────────────────────────────────────────────────────────────
+async function openTrainModal() {
+  document.getElementById('trainModal').classList.add('open');
+  await loadTrainList();
+}
+function closeTrainModal(e) {
+  if (e && e.target !== document.getElementById('trainModal')) return;
+  document.getElementById('trainModal').classList.remove('open');
+}
+
+async function loadTrainList() {
+  try {
+    const r = await fetch('/api/training');
+    const d = await r.json();
+    document.getElementById('trainCount').textContent = d.count || 0;
+    const list = document.getElementById('trainList');
+    if (!d.examples?.length) {
+      list.innerHTML = '<span style="color:var(--muted);font-size:11px;">No examples yet. Submit some above or press X on trash cards.</span>';
+      return;
+    }
+    list.innerHTML = d.examples.map(e => `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-left:3px solid ${e.is_positive ? 'var(--green)' : 'var(--red)'};border-radius:6px;padding:7px 10px;font-size:11px;display:flex;gap:8px;align-items:flex-start;">
+        <span style="flex:1;min-width:0;">
+          <span style="color:${e.is_positive ? 'var(--green)' : 'var(--red)'};font-weight:700;">${e.is_positive ? '✅' : '❌'}</span>
+          ${e.author_handle ? `<span style="color:var(--muted);">@${esc(e.author_handle)}</span> ` : ''}
+          <span style="color:var(--text);">${esc((e.tweet_text || '').slice(0, 100))}${e.tweet_text?.length > 100 ? '…' : ''}</span>
+          ${e.role_type ? `<span style="color:var(--accent);margin-left:4px;">${esc(e.role_type)}</span>` : ''}
+        </span>
+        <button onclick="removeTrainExample(${e.id})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;flex-shrink:0;line-height:1;">×</button>
+      </div>`).join('');
+  } catch (err) { console.error('loadTrainList:', err); }
+}
+
+async function submitTrainExample() {
+  const tweet_text    = document.getElementById('trainTweetText').value.trim();
+  const author_bio    = document.getElementById('trainAuthorBio').value.trim();
+  const author_handle = document.getElementById('trainHandle').value.trim().replace(/^@/, '');
+  const role_type     = document.getElementById('trainRole').value;
+  const subspace      = document.getElementById('trainSubspace').value;
+  if (!tweet_text) { toast('Paste the tweet text first'); return; }
+  try {
+    const r = await fetch('/api/training', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tweet_text, author_bio, author_handle, role_type, subspace }),
+    });
+    const d = await r.json();
+    if (!d.ok) { toast('Error: ' + d.error); return; }
+    document.getElementById('trainTweetText').value = '';
+    document.getElementById('trainAuthorBio').value = '';
+    document.getElementById('trainHandle').value    = '';
+    document.getElementById('trainRole').value      = '';
+    document.getElementById('trainSubspace').value  = '';
+    await loadTrainList();
+    toast('✅ Example saved — Groq will use it from next fetch');
+  } catch (err) { toast('Error saving example'); }
+}
+
+async function removeTrainExample(id) {
+  await fetch(`/api/training/${id}`, { method: 'DELETE' });
+  await loadTrainList();
+  toast('Example removed');
 }
 
 // ─── Utilities ─────────────────────────────────────────────────────────────────

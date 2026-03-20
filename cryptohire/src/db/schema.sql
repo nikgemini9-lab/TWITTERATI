@@ -51,3 +51,22 @@ CREATE TABLE IF NOT EXISTS vip_watchlist (
   user_id  TEXT,
   added_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Confirmed positive examples fed manually by the user.
+-- These are injected as few-shot examples into the classifier prompt
+-- so Groq learns what a real crypto job looks like.
+-- Confirmed examples fed by the user to calibrate the classifier.
+-- is_positive=1 → real crypto job (manually submitted via Train AI modal)
+-- is_positive=0 → NOT a job (auto-saved when user presses X to archive)
+-- Both are injected as few-shot examples into the classifier prompt.
+CREATE TABLE IF NOT EXISTS training_examples (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  tweet_text    TEXT NOT NULL,
+  author_bio    TEXT NOT NULL DEFAULT '',
+  author_handle TEXT NOT NULL DEFAULT '',
+  role_type     TEXT,
+  subspace      TEXT,
+  is_positive   INTEGER NOT NULL DEFAULT 1,  -- 1=real job, 0=trash
+  note          TEXT,
+  added_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
