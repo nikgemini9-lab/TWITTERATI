@@ -33,7 +33,14 @@ async function initSchema() {
   // Run each statement individually (libsql doesn't support multi-statement exec)
   const statements = schema.split(';').map((s) => s.trim()).filter(Boolean);
   for (const sql of statements) {
-    await getClient().execute(sql);
+    try {
+      await getClient().execute(sql);
+    } catch (err) {
+      // ALTER TABLE … ADD COLUMN fails if the column already exists (no IF NOT EXISTS in SQLite).
+      // Silently skip — the column is already there.
+      if (err.message && err.message.includes('duplicate column name')) continue;
+      throw err;
+    }
   }
   console.log('[DB] Schema initialised');
 }

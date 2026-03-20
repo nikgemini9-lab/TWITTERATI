@@ -21,24 +21,50 @@ function sleep(ms) {
 // No complex boolean chains, no parentheses groups.
 // Every query has both a hiring signal AND a crypto signal baked in.
 
+// Exclusion suffix appended to every query.
+// Negative keywords keep Twitter's result set clean before our pre-filter runs.
+const EXCL = '-airdrop -bounty -giveaway -whitelist -shill -filter:replies';
+
 const QUERIES = [
-  // 2-keyword combos — Twitter must find BOTH words anywhere in the tweet.
-  // Simple = more results. Pre-filter + AI do the quality control.
-  'crypto hiring -filter:replies',
-  'web3 hiring -filter:replies',
-  'defi hiring -filter:replies',
-  'blockchain hiring -filter:replies',
-  'solana hiring -filter:replies',
-  'ethereum hiring -filter:replies',
-  'nft hiring -filter:replies',
-  'dao hiring -filter:replies',
-  'crypto "open role" -filter:replies',
-  'web3 "open role" -filter:replies',
-  'crypto "open position" -filter:replies',
-  'web3 "open position" -filter:replies',
-  'crypto "looking for" -filter:replies',
-  'web3 "looking for" -filter:replies',
-  'solana "looking for" -filter:replies',
+  // ── Hiring intent + ecosystem ────────────────────────────────────────────────
+  `crypto hiring ${EXCL}`,
+  `web3 hiring ${EXCL}`,
+  `defi hiring ${EXCL}`,
+  `solana hiring ${EXCL}`,
+  `ethereum hiring ${EXCL}`,
+  `blockchain hiring ${EXCL}`,
+  `arbitrum hiring ${EXCL}`,
+  `starknet hiring ${EXCL}`,
+  `cosmos hiring ${EXCL}`,
+
+  // ── Hiring intent + specific role/skill ─────────────────────────────────────
+  `hiring solidity ${EXCL}`,
+  `hiring "smart contract" ${EXCL}`,
+  `hiring "zk engineer" ${EXCL}`,
+  `hiring "protocol engineer" ${EXCL}`,
+  `hiring "blockchain engineer" ${EXCL}`,
+  `hiring devrel web3 ${EXCL}`,
+  `hiring "community manager" web3 ${EXCL}`,
+  `hiring "growth lead" crypto ${EXCL}`,
+  `hiring "product manager" web3 ${EXCL}`,
+
+  // ── Open role / open position ────────────────────────────────────────────────
+  `web3 "open role" ${EXCL}`,
+  `crypto "open role" ${EXCL}`,
+  `web3 "open position" ${EXCL}`,
+  `defi "open position" ${EXCL}`,
+
+  // ── Looking for ─────────────────────────────────────────────────────────────
+  `"looking for" solidity ${EXCL}`,
+  `"looking for" "smart contract" ${EXCL}`,
+  `web3 "looking for" engineer ${EXCL}`,
+  `solana "looking for" developer ${EXCL}`,
+
+  // ── Quality signals (funded startups) ───────────────────────────────────────
+  `web3 "series a" hiring ${EXCL}`,
+  `crypto "seed round" hiring ${EXCL}`,
+  `"backed by" hiring web3 ${EXCL}`,
+  `"raised" hiring solidity ${EXCL}`,
 ];
 
 // ─── Parse a rettiwt Tweet into our raw job candidate shape ──────────────────
@@ -67,10 +93,9 @@ function tweetToCandidate(tweet) {
 
 // ─── Hard pre-filter ──────────────────────────────────────────────────────────
 // Twitter's search is fuzzy — it matches across bios, names, and handles,
-// not just tweet text. This means a tweet like "FREE $SOL in your wallet"
-// can appear in a "hiring" search if the author's bio mentions hiring.
-// We reject anything that doesn't contain at least one hiring keyword in
-// the actual tweet text. This happens before the AI ever sees the tweet.
+// not just tweet text. We apply two checks:
+//   1. Tweet text must contain at least one hiring signal
+//   2. Tweet text must NOT contain spam/scam terms
 
 const HIRING_TERMS = [
   'hiring', 'hire', 'we\'re hiring', 'now hiring',
@@ -80,11 +105,21 @@ const HIRING_TERMS = [
   'seeking a', 'seeking an', 'we need a', 'we need an',
   'dm to apply', 'send your cv', 'send cv', 'send resume',
   'job opening', 'job opportunity', 'work with us',
-  'onboarding', 'new role', 'full-time', 'part-time', 'contract role',
+  'new role', 'full-time', 'part-time', 'contract role',
+  'open to hiring', 'actively hiring',
+];
+
+// Hard-reject these regardless of hiring keywords — they're always noise
+const SPAM_TERMS = [
+  'airdrop', 'bounty', 'giveaway', 'whitelist', 'ambassador program',
+  'shill', 'pump', 'meme coin', 'memecoin', 'presale', 'pre-sale',
+  'free tokens', 'free nft', '100x', '1000x', 'moonshot',
+  'engage', 'reply guys', 'let\'s network', 'late night connections',
 ];
 
 function looksLikeHiring(text) {
   const lower = (text || '').toLowerCase();
+  if (SPAM_TERMS.some((t) => lower.includes(t))) return false;
   return HIRING_TERMS.some((t) => lower.includes(t));
 }
 

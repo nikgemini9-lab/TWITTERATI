@@ -44,14 +44,15 @@ async function upsertJob(job) {
       author_verified, tweet_text, likes, retweets, replies, views,
       posted_at, tweet_url,
       role_type, subspace, remote, seniority, contact_method, ai_summary,
-      confidence, classified_at, last_updated
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))
+      confidence, quality_score, poster_type, role_title, company, skills,
+      classified_at, last_updated
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))
     ON CONFLICT (tweet_id) DO UPDATE SET
-      likes        = excluded.likes,
-      retweets     = excluded.retweets,
-      replies      = excluded.replies,
-      views        = excluded.views,
-      last_updated = datetime('now')`,
+      likes         = excluded.likes,
+      retweets      = excluded.retweets,
+      replies       = excluded.replies,
+      views         = excluded.views,
+      last_updated  = datetime('now')`,
     [
       job.tweet_id, job.author_handle, job.author_name, job.author_bio,
       job.author_followers,
@@ -62,6 +63,8 @@ async function upsertJob(job) {
       job.role_type, job.subspace,
       job.remote === null || job.remote === undefined ? null : (job.remote ? 1 : 0),
       job.seniority, job.contact_method, job.ai_summary, job.confidence,
+      job.quality_score ?? null, job.poster_type ?? null,
+      job.role_title ?? null, job.company ?? null, job.skills ?? null,
     ]
   );
 }

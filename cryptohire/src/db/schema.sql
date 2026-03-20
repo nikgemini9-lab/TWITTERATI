@@ -27,11 +27,25 @@ CREATE TABLE IF NOT EXISTS jobs (
   confidence       REAL,
   classified_at    TEXT,
 
+  -- AI quality intelligence (v2)
+  quality_score    INTEGER,  -- 1–10 overall job quality score
+  poster_type      TEXT,     -- founder | hiring_manager | recruiter | employee | unknown
+  role_title       TEXT,     -- extracted role title e.g. "Senior Solidity Engineer"
+  company          TEXT,     -- extracted company / project name
+  skills           TEXT,     -- comma-separated skills e.g. "Solidity, EVM, DeFi"
+
   -- Manual management
   is_archived      INTEGER NOT NULL DEFAULT 0,  -- 0/1 boolean
   is_filled        INTEGER NOT NULL DEFAULT 0,  -- 0/1 boolean
   archived_at      TEXT
 );
+
+-- Migrations for pre-existing databases (ignored if column already exists)
+ALTER TABLE jobs ADD COLUMN quality_score  INTEGER;
+ALTER TABLE jobs ADD COLUMN poster_type    TEXT;
+ALTER TABLE jobs ADD COLUMN role_title     TEXT;
+ALTER TABLE jobs ADD COLUMN company        TEXT;
+ALTER TABLE jobs ADD COLUMN skills         TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_jobs_posted_at    ON jobs(posted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_jobs_role_type    ON jobs(role_type);

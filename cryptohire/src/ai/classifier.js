@@ -4,11 +4,13 @@ const OpenAI = require('openai');
 const config = require('../config');
 const { getTrainingExamples } = require('../db/queries');
 
-const ROLE_TYPES  = ['engineer', 'researcher', 'trader', 'analyst', 'marketing', 'ops', 'design', 'bd', 'content', 'other'];
-const SUBSPACES   = ['prediction_markets', 'defi', 'trading', 'nft', 'infrastructure', 'general_web3', 'other'];
+const ROLE_TYPES    = ['engineer', 'researcher', 'trader', 'analyst', 'marketing', 'ops', 'design', 'bd', 'content', 'other'];
+const SUBSPACES     = ['prediction_markets', 'defi', 'trading', 'nft', 'infrastructure', 'general_web3', 'other'];
+const POSTER_TYPES  = ['founder', 'hiring_manager', 'recruiter', 'employee', 'unknown'];
 
-const ROLE_SET     = new Set(ROLE_TYPES);
-const SUBSPACE_SET = new Set(SUBSPACES);
+const ROLE_SET        = new Set(ROLE_TYPES);
+const SUBSPACE_SET    = new Set(SUBSPACES);
+const POSTER_TYPE_SET = new Set(POSTER_TYPES);
 
 const API_KEY = process.env.GROQ_API_KEY;
 if (!API_KEY) {
@@ -38,43 +40,95 @@ const MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 // A tweet saying "hiring someone chronically online dm me" tells us nothing —
 // but if the bio says "building prediction markets" it's an obvious match.
 
-const SYSTEM_PROMPT = `You are a strict classifier that identifies crypto/web3 job postings from tweets.
+const SYSTEM_PROMPT = `You are an elite Web3 talent scout. Your job is to find ONLY the highest-quality, most legitimate crypto/web3 job opportunities from tweets.
 
-You will receive tweets (possibly with no crypto keywords) along with the author's Twitter bio.
-Use BOTH pieces of information to determine if this is a hiring post from someone in the crypto/web3 space.
+You receive each tweet's text and the author's Twitter bio. Analyse BOTH carefully.
 
-Crypto/web3 space INCLUDES:
-- Prediction markets (Polymarket, Manifold, Kalshi, etc.)
-- DeFi protocols, DEXs, lending, yield, stablecoins
-- Trading firms/funds/market makers with explicit crypto/blockchain focus
-- Blockchain infrastructure (L1s, L2s, bridges, wallets, nodes)
-- NFT projects and marketplaces
-- General crypto/web3 startups and DAOs
-- Crypto-focused VCs and accelerators
-- Web3 marketing, community management, social media, content, growth roles at crypto companies
+━━━ STEP 1: REJECT IMMEDIATELY (set is_crypto_hiring: false, quality_score: 0) ━━━
 
-HARD REJECTIONS — set is_crypto_hiring: false if:
-- The author or bio is about sports (football, soccer, basketball, baseball, FPL, fantasy sports, tipsters, betting)
-- The author or bio is about general finance/stocks/forex with no crypto/blockchain mention
-- The tweet is in a non-English language and shows no crypto/blockchain signals
-- The platform is a general-purpose trading tool (e.g. TrendSpider, TradingView) with no stated crypto focus
-- The role is at a sports analytics, e-sports, or gambling company (not blockchain-based)
-- The tweet is promotional/marketing content, not an actual job post
-- Confidence would be below 0.80
+Reject if ANY of these apply:
+• Tweet contains: "airdrop", "bounty", "giveaway", "whitelist", "ambassador program", "shill", "raid", "meme coin", "memecoin", "referral"
+• Author bio is about: sports, football, FPL, fantasy sports, betting tipster, general stocks/forex (no crypto mention)
+• Tweet is promotional/marketing content, not an actual job posting
+• Tweet is engagement bait ("reply guys always win", "let's network", "late night connections")
+• No actual role is described — just vibes ("DM me", "opportunities available", "join our community")
+• Non-English tweet with no crypto/web3 signals
+• General-purpose SaaS/fintech with no blockchain focus
 
-Role types: engineer, researcher, trader, analyst, marketing, ops, design, bd, content, other
-Subspaces: prediction_markets, defi, trading, nft, infrastructure, general_web3, other
-Seniorities: junior, mid, senior, lead, any
-Contact methods: dm, email, link, apply
+━━━ STEP 2: CLASSIFY POSTER TYPE ━━━
 
-Rules:
-- is_crypto_hiring: true ONLY if this is a genuine job posting from a confirmed crypto/web3 entity
-- Use author bio as primary signal — if bio has no crypto/blockchain/web3/DeFi/NFT/DAO keywords, be very skeptical
-- Confidence: 0.0–1.0. Be conservative. Anything below 0.80 should be false.
-- ai_summary: one concise sentence (e.g. "DeFi protocol hiring a senior smart contract engineer, remote, apply via link")
-- Reply ONLY with a valid JSON array. No markdown, no explanation, no code fences.
+Determine poster_type from bio + tweet tone:
+• "founder"         → Founder/Co-founder/CEO building the protocol or company
+• "hiring_manager"  → Head of X, VP, Director, or team lead hiring for their team
+• "recruiter"       → Explicitly a recruiter, talent partner, headhunter, or talent scout
+• "employee"        → Engineer/contributor at a company posting on behalf of their team
+• "unknown"         → Can't determine from available info
 
-Format: [{"tweet_id":"...","is_crypto_hiring":bool,"confidence":0.0,"role_type":"...","subspace":"...","remote":bool|null,"seniority":"..."|null,"contact_method":"..."|null,"ai_summary":"..."}]`;
+━━━ STEP 3: SCORE QUALITY (1–10) ━━━
+
+Score based on these weighted factors:
+
+POSTER CREDIBILITY (0–3 pts):
+  3 pts → Founder/Co-founder hiring directly
+  2 pts → Hiring manager or senior team member
+  1 pt  → Recruiter with named company/project
+  0 pts → Unknown account, no verifiable affiliation
+
+COMPANY/PROJECT QUALITY (0–2 pts):
+  2 pts → Named funded project (mentions raise, backed, seed, Series A/B, known ecosystem team)
+  1 pt  → Named project with some web3 presence
+  0 pts → Anonymous, unnamed, or purely speculative
+
+JOB CLARITY (0–3 pts):
+  3 pts → Clear role title + required skills + salary/equity or apply link
+  2 pts → Clear role title + skills (no link/salary)
+  1 pt  → General role title, few details
+  0 pts → Vague ("hiring engineers", no specifics)
+
+SIGNAL CLEANLINESS (0–2 pts):
+  2 pts → Professional, specific, no engagement farming
+  1 pt  → Mostly clean but has some "RT to spread" or vague CTA
+  0 pts → Spammy, "gm" crowd, no signal
+
+MINIMUM THRESHOLD: quality_score must be ≥ 7 for is_crypto_hiring: true.
+Anything scored 1–6 → is_crypto_hiring: false.
+
+━━━ STEP 4: EXTRACT STRUCTURED DATA ━━━
+
+For each accepted job (quality_score ≥ 7) extract:
+• role_title   → Specific title e.g. "Senior Solidity Engineer", "DeFi Protocol Growth Lead"
+• company      → Company or project name (null if not mentioned)
+• skills       → Comma-separated key skills mentioned e.g. "Solidity, EVM, Foundry, DeFi"
+• location     → "Remote", "On-site: [City]", "Hybrid: [City]", or null
+• contact_method → dm | email | link | apply
+
+━━━ VALID VALUES ━━━
+
+role_type: engineer | researcher | trader | analyst | marketing | ops | design | bd | content | other
+subspace: prediction_markets | defi | trading | nft | infrastructure | general_web3 | other
+seniority: junior | mid | senior | lead | any
+poster_type: founder | hiring_manager | recruiter | employee | unknown
+
+━━━ OUTPUT FORMAT ━━━
+
+Reply ONLY with a valid JSON array. No markdown, no explanation, no code fences.
+
+[{
+  "tweet_id": "...",
+  "is_crypto_hiring": bool,
+  "confidence": 0.0,
+  "quality_score": 0,
+  "poster_type": "...",
+  "role_title": "...",
+  "company": "...",
+  "role_type": "...",
+  "subspace": "...",
+  "remote": bool|null,
+  "seniority": "..."|null,
+  "contact_method": "..."|null,
+  "skills": "...",
+  "ai_summary": "one sentence: who is hiring, what role, key skills, location, how to apply"
+}]`;
 
 // ─── Batch classify ───────────────────────────────────────────────────────────
 
@@ -179,19 +233,26 @@ async function classifyChunk(candidates, fewShot = '') {
     if (!entry?.tweet_id) continue;
     if (!entry.is_crypto_hiring) continue;
     if ((entry.confidence ?? 0) < config.minConfidence) continue;
+    // Enforce quality gate — anything below 7 is noise regardless of confidence
+    if ((entry.quality_score ?? 0) < 7) continue;
 
     const candidate = candidateMap.get(String(entry.tweet_id));
     if (!candidate) continue;
 
     jobs.push({
       ...candidate,
-      role_type:      ROLE_SET.has(entry.role_type)    ? entry.role_type    : 'other',
-      subspace:       SUBSPACE_SET.has(entry.subspace) ? entry.subspace     : 'general_web3',
+      role_type:      ROLE_SET.has(entry.role_type)          ? entry.role_type    : 'other',
+      subspace:       SUBSPACE_SET.has(entry.subspace)       ? entry.subspace     : 'general_web3',
+      poster_type:    POSTER_TYPE_SET.has(entry.poster_type) ? entry.poster_type  : 'unknown',
       remote:         entry.remote ?? null,
       seniority:      entry.seniority || null,
       contact_method: entry.contact_method || null,
       ai_summary:     entry.ai_summary || null,
       confidence:     entry.confidence,
+      quality_score:  entry.quality_score ?? null,
+      role_title:     entry.role_title || null,
+      company:        entry.company || null,
+      skills:         entry.skills || null,
     });
   }
 
