@@ -8,7 +8,7 @@ const config = {
 
   // Minimum AI confidence (0–1) to store a classified job.
   // Tweets below this threshold are discarded.
-  minConfidence: 0.70,
+  minConfidence: 0.80,
 };
 
 module.exports = config;

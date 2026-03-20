@@ -293,8 +293,13 @@
     <span class="logo-icon">⛓</span>
     <span class="logo-text">Crypto<span>Hire</span></span>
   </div>
-  <div id="cookieStatus" style="font-size:11px;color:var(--muted);display:flex;align-items:center;">
-    <span class="cookie-dot" id="cookieDot"></span><span id="cookieText">loading…</span>
+  <div id="cookieStatus" style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:14px;">
+    <span style="display:flex;align-items:center;gap:5px;" title="Twitter cookie health">
+      <span class="cookie-dot" id="cookieDot"></span><span id="cookieText">loading…</span>
+    </span>
+    <span style="display:flex;align-items:center;gap:5px;" title="Groq AI classifier health">
+      <span class="cookie-dot" id="groqDot"></span><span id="groqText">AI…</span>
+    </span>
   </div>
   <div class="header-stats">
     <div class="hstat"><div class="hstat-val" id="statActive">—</div><div class="hstat-lbl">Active</div></div>
@@ -462,6 +467,16 @@ async function loadStats() {
     txt.textContent = health.status === 'ok'
       ? `Last fetch: ${timeAgo(d.stats.scheduler.lastFetch)}`
       : (health.reason || health.status || '');
+
+    // Groq health (polled separately so it doesn't slow down stats)
+    fetch('/api/health').then(r => r.json()).then(h => {
+      if (!h.ok) return;
+      const gDot = document.getElementById('groqDot');
+      const gTxt = document.getElementById('groqText');
+      const g = h.health?.groq || {};
+      gDot.className = `cookie-dot ${g.status || ''}`;
+      gTxt.textContent = g.status === 'ok' ? 'AI ok' : (g.reason || g.status || 'AI ?');
+    }).catch(() => {});
 
     // Sidebar
     renderSidebar(d.roles || [], d.subspaces || []);

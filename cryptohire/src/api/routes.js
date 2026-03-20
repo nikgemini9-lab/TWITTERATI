@@ -8,6 +8,7 @@ const {
 } = require('../db/queries');
 const { runFetch, state } = require('../scheduler');
 const config = require('../config');
+const OpenAI = require('openai');
 
 const router = Router();
 
@@ -146,6 +147,41 @@ router.delete('/vip/:handle', async (req, res) => {
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+// ─── GET /api/health ──────────────────────────────────────────────────────────
+// Live health check for both Twitter cookie and Groq API.
+// Makes a real (cheap) call to Groq so you can see if it's actually working.
+
+router.get('/health', async (req, res) => {
+  const result = {
+    cookie: cookieHealth(),
+    groq:   { status: 'unknown', reason: null },
+  };
+
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    result.groq = { status: 'dead', reason: 'GROQ_API_KEY env var not set' };
+    return res.json({ ok: true, health: result });
+  }
+
+  try {
+    const client = new OpenAI({
+      apiKey,
+      baseURL: 'https://api.groq.com/openai/v1',
+    });
+    const resp = await client.chat.completions.create({
+      model:      process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+      max_tokens: 5,
+      messages:   [{ role: 'user', content: 'ping' }],
+    });
+    const used = resp.usage?.total_tokens ?? '?';
+    result.groq = { status: 'ok', reason: `responded (${used} tokens)` };
+  } catch (err) {
+    result.groq = { status: 'dead', reason: err.message?.slice(0, 120) };
+  }
+
+  res.json({ ok: true, health: result });
 });
 
 module.exports = router;

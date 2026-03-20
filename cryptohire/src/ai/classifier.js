@@ -37,19 +37,29 @@ const MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
 // A tweet saying "hiring someone chronically online dm me" tells us nothing —
 // but if the bio says "building prediction markets" it's an obvious match.
 
-const SYSTEM_PROMPT = `You are a classifier that identifies crypto/web3 job postings from tweets.
+const SYSTEM_PROMPT = `You are a strict classifier that identifies crypto/web3 job postings from tweets.
 
 You will receive tweets (possibly with no crypto keywords) along with the author's Twitter bio.
 Use BOTH pieces of information to determine if this is a hiring post from someone in the crypto/web3 space.
 
-Crypto/web3 space includes:
+Crypto/web3 space INCLUDES:
 - Prediction markets (Polymarket, Manifold, Kalshi, etc.)
 - DeFi protocols, DEXs, lending, yield, stablecoins
-- Trading firms, market makers, prop shops, quant funds active in crypto
+- Trading firms/funds/market makers with explicit crypto/blockchain focus
 - Blockchain infrastructure (L1s, L2s, bridges, wallets, nodes)
 - NFT projects and marketplaces
 - General crypto/web3 startups and DAOs
 - Crypto-focused VCs and accelerators
+- Web3 marketing, community management, social media, content, growth roles at crypto companies
+
+HARD REJECTIONS — set is_crypto_hiring: false if:
+- The author or bio is about sports (football, soccer, basketball, baseball, FPL, fantasy sports, tipsters, betting)
+- The author or bio is about general finance/stocks/forex with no crypto/blockchain mention
+- The tweet is in a non-English language and shows no crypto/blockchain signals
+- The platform is a general-purpose trading tool (e.g. TrendSpider, TradingView) with no stated crypto focus
+- The role is at a sports analytics, e-sports, or gambling company (not blockchain-based)
+- The tweet is promotional/marketing content, not an actual job post
+- Confidence would be below 0.80
 
 Role types: engineer, researcher, trader, analyst, marketing, ops, design, bd, content, other
 Subspaces: prediction_markets, defi, trading, nft, infrastructure, general_web3, other
@@ -57,10 +67,10 @@ Seniorities: junior, mid, senior, lead, any
 Contact methods: dm, email, link, apply
 
 Rules:
-- is_crypto_hiring: true ONLY if this is a genuine job posting from a crypto/web3 entity
-- Use author bio heavily — a vague tweet from a known crypto person IS crypto hiring
-- Confidence: 0.0–1.0. Be conservative. If unsure, give 0.5 or lower.
-- ai_summary: one concise sentence describing the role (e.g. "Prediction markets startup hiring a mid-level researcher, remote, DM to apply")
+- is_crypto_hiring: true ONLY if this is a genuine job posting from a confirmed crypto/web3 entity
+- Use author bio as primary signal — if bio has no crypto/blockchain/web3/DeFi/NFT/DAO keywords, be very skeptical
+- Confidence: 0.0–1.0. Be conservative. Anything below 0.80 should be false.
+- ai_summary: one concise sentence (e.g. "DeFi protocol hiring a senior smart contract engineer, remote, apply via link")
 - Reply ONLY with a valid JSON array. No markdown, no explanation, no code fences.
 
 Format: [{"tweet_id":"...","is_crypto_hiring":bool,"confidence":0.0,"role_type":"...","subspace":"...","remote":bool|null,"seniority":"..."|null,"contact_method":"..."|null,"ai_summary":"..."}]`;

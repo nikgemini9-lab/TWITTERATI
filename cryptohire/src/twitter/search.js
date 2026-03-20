@@ -18,7 +18,7 @@ function sleep(ms) {
 // table, so processing each tweet exactly once.
 
 const QUERIES = [
-  // The classic "hiring + dm me" pattern
+  // Classic "hiring + dm me" pattern
   'hiring "dm me" -filter:replies',
   // Explicit hiring posts
   'hiring -filter:replies',
@@ -26,10 +26,17 @@ const QUERIES = [
   '"open role" OR "open position" -filter:replies',
   // "looking for" hiring pattern
   '"looking for" (hire OR role OR join) -filter:replies',
-  // "we\'re hiring" / "we are hiring"
+  // "we're hiring" / "we are hiring"
   '"we\'re hiring" OR "we are hiring" -filter:replies',
-  // Seeking candidates
+  // Seeking technical candidates
   '"seeking" (engineer OR researcher OR analyst OR trader) -filter:replies',
+  // Web3 community / social / marketing roles
+  '(web3 OR crypto OR defi OR dao) ("community manager" OR "community lead") -filter:replies',
+  '(web3 OR crypto OR blockchain) ("social media manager" OR "social media") hiring -filter:replies',
+  '(web3 OR crypto OR defi) ("growth" OR "marketing manager" OR "head of marketing") hiring -filter:replies',
+  '(web3 OR crypto OR nft OR dao) "content creator" OR "content writer" OR "copywriter" hiring -filter:replies',
+  // BD / partnerships
+  '(web3 OR crypto OR defi OR blockchain) ("business development" OR "partnerships") hiring -filter:replies',
 ];
 
 // ─── Parse a rettiwt Tweet into our raw job candidate shape ──────────────────
