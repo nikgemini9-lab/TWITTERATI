@@ -10,7 +10,7 @@ function getClient() {
   if (_client && _cachedKey === apiKey) return _client;
 
   const cfg = {
-    delay:   parseInt(process.env.REQUEST_DELAY_MS, 10) || 1000,
+    delay:   parseInt(process.env.REQUEST_DELAY_MS, 10) || 2000,
     logging: process.env.RETTIWT_LOGGING === 'true',
   };
 

@@ -11,11 +11,19 @@ const state = {
   lastFetchError:         null,   // last error message from fetchViralTweets
   lastFetchCount:         null,   // how many tweets were upserted on the last fetch run
   consecutiveZeroFetches: 0,      // increments when fetch returns 0; resets on any result
+  coolingDownUntil:       null,   // when rate-limited, skip fetches until this timestamp
 };
 
 // ─── Job wrappers ─────────────────────────────────────────────────────────────
 
 async function runFetch() {
+  // Skip if we're in a rate-limit cooldown period
+  if (state.coolingDownUntil && Date.now() < state.coolingDownUntil) {
+    const remaining = Math.ceil((state.coolingDownUntil - Date.now()) / 60000);
+    console.log(`[Scheduler] cooling down — skipping fetch (${remaining}min remaining)`);
+    return;
+  }
+
   if (state.fetchRunning) {
     console.log('[Scheduler] fetch already running, skipping');
     return;
@@ -29,8 +37,13 @@ async function runFetch() {
     state.lastFetchError = null;
     if (count > 0) {
       state.consecutiveZeroFetches = 0;
+      state.coolingDownUntil = null;
     } else {
       state.consecutiveZeroFetches++;
+      if (state.consecutiveZeroFetches >= 3) {
+        state.coolingDownUntil = new Date(Date.now() + 30 * 60 * 1000);
+        console.log('[Scheduler] 3 consecutive zero fetches — entering 30min rate-limit cooldown');
+      }
     }
   } catch (err) {
     console.error('[Scheduler] fetchViralTweets error:', err.message);
@@ -82,11 +95,11 @@ async function runDeepBackfill() {
 // ─── Start scheduler ──────────────────────────────────────────────────────────
 
 function start() {
-  // Fetch new tweets every 10 minutes — tight loop to catch acceleration early
-  cron.schedule('*/10 * * * *', runFetch);
+  // Fetch new tweets every 30 minutes — reduced frequency to avoid X rate limits
+  cron.schedule('*/30 * * * *', runFetch);
 
-  // Refresh + recalculate acceleration every 10 min, offset by 5 so they interleave with fetch
-  cron.schedule('5,15,25,35,45,55 * * * *', runRefresh);
+  // Refresh + recalculate acceleration every 30 min, offset by 15 so they interleave with fetch
+  cron.schedule('15,45 * * * *', runRefresh);
 
   // Daily cleanup at 03:00
   cron.schedule('0 3 * * *', runCleanup);
@@ -94,7 +107,7 @@ function start() {
   // Daily deep backfill at 02:00 — 48h lookback at 30K+ threshold
   cron.schedule('0 2 * * *', runDeepBackfill);
 
-  console.log('[Scheduler] Jobs scheduled: fetch=10min, refresh=10min(offset 5min), deep-backfill=daily 02:00, cleanup=daily 03:00');
+  console.log('[Scheduler] Jobs scheduled: fetch=30min, refresh=30min(offset 15min), deep-backfill=daily 02:00, cleanup=daily 03:00');
 
   // Run fetch immediately on startup so data is available right away
   setImmediate(runFetch);

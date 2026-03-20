@@ -106,8 +106,8 @@ async function fetchViralTweets() {
 
     cursor = result?.next?.value;
     page++;
-    if (cursor) await sleep(500);
-  } while (cursor && page < 10); // 10 pages = 200 tweets per cycle is plenty
+    if (cursor) await sleep(2000);
+  } while (cursor && page < 3); // 3 pages = 60 tweets per cycle — conservative to avoid rate limits
 
   console.log(`[Twitter] fetchViralTweets → ${processed} tweets upserted (${page} pages)`);
   classifyNewTweets().catch(err => console.error('[AI] classifyNewTweets error:', err.message));
@@ -209,7 +209,7 @@ async function deepBackfill() {
 
     cursor = result?.next?.value;
     page++;
-    if (cursor) await sleep(500);
+    if (cursor) await sleep(2000);
   } while (cursor);
 
   console.log(`[Twitter] deepBackfill → ${processed} tweets upserted (${page} pages)`);
