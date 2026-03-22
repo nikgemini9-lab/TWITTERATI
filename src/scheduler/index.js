@@ -46,8 +46,9 @@ async function runFetch() {
       }
     }
   } catch (err) {
-    console.error('[Scheduler] fetchViralTweets error:', err.message);
-    state.lastFetchError = err.message;
+    const details = err.details?.length ? JSON.stringify(err.details) : '';
+    console.error('[Scheduler] fetchViralTweets error:', err.message, details);
+    state.lastFetchError = err.message + (details ? ` | ${details}` : '');
   } finally {
     state.fetchRunning = false;
   }

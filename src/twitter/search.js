@@ -78,9 +78,11 @@ async function fetchViralTweets() {
     minLikes:     config.minLikes,
     onlyOriginal: true,
     ...(config.minRetweets > 0 && { minRetweets: config.minRetweets }),
+    ...(config.language      && { language: config.language }),
   };
 
-  console.log(`[Twitter] fetch: min_faves:${config.minLikes} -filter:replies`);
+  const queryDesc = `min_faves:${config.minLikes}${config.language ? ` lang:${config.language}` : ''} -filter:replies`;
+  console.log(`[Twitter] fetch: ${queryDesc}`);
 
   let processed = 0;
   let cursor    = undefined;
@@ -173,6 +175,7 @@ async function deepBackfill() {
     minLikes,
     onlyOriginal: true,
     startDate,
+    ...(config.language && { language: config.language }),
   };
 
   console.log(`[Twitter] deepBackfill: min_faves:${minLikes} since:${startDate.toISOString()}`);
