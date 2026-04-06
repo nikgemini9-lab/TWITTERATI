@@ -18,6 +18,7 @@ function calcViralityScore({
   likes_per_hour = 0, acceleration = 0,
   engagement_rate = 0, rt_ratio = 0,
   posted_at = null,
+  has_media = false, media_type = null,
 }) {
   // Use real-time lph if available; otherwise estimate from tweet age
   const ageHours = posted_at
@@ -52,7 +53,19 @@ function calcViralityScore({
   const rtReplyRatio = retweets / Math.max(1, replies);
   const memeSpreadBonus = rtReplyRatio > 10 ? Math.min(200, rtReplyRatio * 5) : 0;
 
-  return Math.round(velocityScore + spreadScore + momentumScore + engagementScore + baseScore + bookmarkScore + memeSpreadBonus);
+  const rawScore = velocityScore + spreadScore + momentumScore + engagementScore + baseScore + bookmarkScore + memeSpreadBonus;
+
+  // 8. Media multiplier — tweets with images/video go viral far more often than
+  //    plain-text tweets. Apply a proportional boost so media content ranks higher
+  //    across all velocity tiers.
+  //      photo : ×1.4  (static images dominate viral content)
+  //      video/gif : ×1.25  (motion media also outperforms text)
+  //      text-only : ×1.0  (no change)
+  const mediaMultiplier = has_media
+    ? (media_type === 'photo' ? 1.4 : 1.25)
+    : 1.0;
+
+  return Math.round(rawScore * mediaMultiplier);
 }
 
 // ─── Upsert tweet (create or update metrics) ─────────────────────────────────
@@ -189,7 +202,7 @@ async function recalculateGrowth() {
     )
     SELECT
       l.tweet_id,
-      t.likes, t.retweets, t.replies, t.views, t.bookmarks, t.engagement_rate, t.rt_ratio, t.posted_at,
+      t.likes, t.retweets, t.replies, t.views, t.bookmarks, t.engagement_rate, t.rt_ratio, t.posted_at, t.has_media, t.media_type,
 
       -- recent velocity (latest → mid)
       CASE WHEN m.tweet_id IS NOT NULL AND l.recorded_at > m.recorded_at THEN
@@ -246,6 +259,8 @@ async function recalculateGrowth() {
       engagement_rate: parseFloat(row.engagement_rate) || 0,
       rt_ratio:       parseFloat(row.rt_ratio) || 0,
       posted_at:      row.posted_at,
+      has_media:      row.has_media || false,
+      media_type:     row.media_type || null,
     });
 
     await db.query(
