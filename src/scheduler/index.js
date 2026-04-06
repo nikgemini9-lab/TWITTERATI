@@ -1,4 +1,6 @@
 const cron = require('node-cron');
+const https = require('https');
+const http  = require('http');
 const { fetchViralTweets, refreshTrackedTweets, fetchVipTimelines, deepBackfill } = require('../twitter/search');
 const { cleanup } = require('../db/queries');
 
@@ -93,6 +95,28 @@ async function runDeepBackfill() {
   }
 }
 
+// ─── Self-ping to prevent Render free-tier sleep ──────────────────────────────
+
+function selfPing() {
+  const base = (process.env.RENDER_EXTERNAL_URL || '').replace(/\/$/, '');
+  if (!base) return; // not running on Render — skip
+
+  const url = `${base}/api/ping`;
+  const mod = url.startsWith('https') ? https : http;
+
+  const req = mod.get(url, (res) => {
+    console.log(`[KeepAlive] ping ${url} → ${res.statusCode}`);
+    res.resume(); // drain response body
+  });
+  req.on('error', (err) => {
+    console.warn('[KeepAlive] ping failed:', err.message);
+  });
+  req.setTimeout(10000, () => {
+    req.destroy();
+    console.warn('[KeepAlive] ping timed out');
+  });
+}
+
 // ─── Start scheduler ──────────────────────────────────────────────────────────
 
 function start() {
@@ -108,7 +132,10 @@ function start() {
   // Daily deep backfill at 02:00 — 48h lookback at 30K+ threshold
   cron.schedule('0 2 * * *', runDeepBackfill);
 
-  console.log('[Scheduler] Jobs scheduled: fetch=30min, refresh=30min(offset 15min), deep-backfill=daily 02:00, cleanup=daily 03:00');
+  // Self-ping every 14 minutes to prevent Render free-tier from sleeping the dyno
+  cron.schedule('*/14 * * * *', selfPing);
+
+  console.log('[Scheduler] Jobs scheduled: fetch=30min, refresh=30min(offset 15min), deep-backfill=daily 02:00, cleanup=daily 03:00, keep-alive=14min');
 
   // Run fetch immediately on startup so data is available right away
   setImmediate(runFetch);
