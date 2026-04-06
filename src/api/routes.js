@@ -5,6 +5,12 @@ const config = require('../config');
 
 const router = Router();
 
+// ─── GET /api/ping ────────────────────────────────────────────────────────────
+// Lightweight keep-alive endpoint — no DB, no scheduler, just 200.
+// Point cron-job.org here so cold-start wakeup succeeds before timeout.
+
+router.get('/ping', (req, res) => res.json({ ok: true, t: Date.now() }));
+
 // ─── GET /api/tweets ──────────────────────────────────────────────────────────
 // Query params:
 //   status     = all | normal | fast | parabolic
